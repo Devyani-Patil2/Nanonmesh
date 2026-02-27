@@ -179,10 +179,13 @@ class AppState extends ChangeNotifier {
     _pendingPhone = phoneNumber;
     notifyListeners();
 
-    final prefs = await SharedPreferences.getInstance();
-    final storedPin = prefs.getString('pin_$phoneNumber');
+    // Real "Remember user" logic: Check if they exist in the backend
+    final users = await _firestore.getUsers();
+    final isExistingUser = users.any((u) => u.phone == phoneNumber);
 
-    _isNewUser = (storedPin == null);
+    // Only truly new users (not in backend) must create and confirm PIN
+    _isNewUser = !isExistingUser;
+    
     _verificationId = phoneNumber;
     _isLoading = false;
     notifyListeners();
@@ -219,24 +222,45 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final storedPin = prefs.getString('pin_$_pendingPhone');
 
-    if (storedPin == null) {
+    // Fetch the user from Firestore to see if they are an old user
+    final users = await _firestore.getUsers();
+    final matchedUsers = users.where((u) => u.phone == _pendingPhone).toList();
+
+    if (matchedUsers.isNotEmpty) {
+      // Old user logging in
+      if (storedPin == null) {
+        // They are on a new device or cleared app data. 
+        // We accept the PIN they just entered as their new local PIN.
+        await prefs.setString('pin_$_pendingPhone', pin);
+      } else if (storedPin != pin) {
+        _authError = 'Incorrect PIN. Please try again.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Log them in securely
+      _currentUser = matchedUsers.first;
+      await prefs.setString('userId', _currentUser!.id);
+      await prefs.setString('userName', _currentUser!.name);
+      
+      // Load their data
+      await _loadDataFromFirestore();
+      _startListeningToFirestore();
+
+      _isAuthenticated = true;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+
+    } else {
+      // User doesn't exist in backend AND is trying to verify PIN?
+      // This shouldn't normally happen since checkPhone routes them to create PIN.
       _authError = 'No account found. Please sign up first.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
-
-    if (storedPin != pin) {
-      _authError = 'Incorrect PIN. Please try again.';
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-
-    _isAuthenticated = true;
-    _isLoading = false;
-    notifyListeners();
-    return true;
   }
 
   // Compatibility wrappers
@@ -262,8 +286,12 @@ class AppState extends ChangeNotifier {
       latitude = position.latitude;
       longitude = position.longitude;
       if (village.isEmpty || village == 'Unknown') {
-        resolvedVillage =
-            await _location.getVillageFromCoordinates(latitude, longitude);
+        final localeIdentifier = '${_locale.languageCode}_${_locale.countryCode}';
+        resolvedVillage = await _location.getVillageFromCoordinates(
+          latitude, 
+          longitude,
+          localeIdentifier: localeIdentifier,
+        );
       }
     }
 

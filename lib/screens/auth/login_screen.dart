@@ -59,9 +59,16 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(gradient: AppTheme.heroGradient),
-        child: SafeArea(
-          child: SingleChildScrollView(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/splash_bg.jpg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.35),
+          child: SafeArea(
+            child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,7 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 FadeInLeft(
                   delay: const Duration(milliseconds: 200),
                   child: Text(
-                    'Welcome to\nNanonMesh',
+                    'Welcome to\nAgroSwap',
                     style: GoogleFonts.outfit(
                       fontSize: 34,
                       fontWeight: FontWeight.bold,
@@ -235,7 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     )
                                   : Text(
-                                      'Send OTP',
+                                      'Continue',
                                       style: GoogleFonts.outfit(
                                         fontSize: 17,
                                         fontWeight: FontWeight.w600,
@@ -254,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   delay: const Duration(milliseconds: 700),
                   child: Center(
                     child: Text(
-                      'We\'ll send you an OTP for verification',
+                      'Secure PIN authentication',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: Colors.white.withValues(alpha: 0.7),
@@ -266,6 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

@@ -42,7 +42,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _permissionDenied = false;
     });
 
-    final result = await LocationService.instance.detectLocation();
+    final appState = context.read<AppState>();
+    final localeIdentifier = '${appState.locale.languageCode}_${appState.locale.countryCode}';
+
+    final result = await LocationService.instance.detectLocation(
+      localeIdentifier: localeIdentifier,
+    );
 
     if (!mounted) return;
 
@@ -97,9 +102,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(gradient: AppTheme.heroGradient),
-        child: SafeArea(
-          child: SingleChildScrollView(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/splash_bg.jpg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.35),
+          child: SafeArea(
+            child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: Form(
               key: _formKey,
@@ -439,6 +451,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ],
               ),
             ),
+          ),
           ),
         ),
       ),

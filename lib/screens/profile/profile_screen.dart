@@ -409,7 +409,7 @@ class ProfileScreen extends StatelessWidget {
                                 transactions: appState.transactions,
                               );
                               await SupplyChainService.instance.shareReport(
-                                'Nanonmesh FPO Report - ${user.name}',
+                                'AgroSwap FPO Report - ${user.name}',
                                 data,
                               );
                             },

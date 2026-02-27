@@ -35,7 +35,7 @@ class LocationService {
 
   /// Full location detection flow: check services → request permissions → get GPS → reverse geocode.
   /// Returns a LocationResult with either success data or a user-friendly error message.
-  Future<LocationResult> detectLocation() async {
+  Future<LocationResult> detectLocation({String? localeIdentifier}) async {
     try {
       // Step 1: Check if location services (GPS) are turned on
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -62,7 +62,7 @@ class LocationService {
 
       if (permission == LocationPermission.deniedForever) {
         return LocationResult(
-          error: 'Location permission is permanently denied. Go to Settings → Apps → NanonMesh → Permissions → Location → Allow.',
+          error: 'Location permission is permanently denied. Go to Settings → Apps → AgroSwap → Permissions → Location → Allow.',
           permissionDenied: true,
         );
       }
@@ -82,6 +82,10 @@ class LocationService {
       String fullAddress = 'Unknown location';
 
       try {
+        if (localeIdentifier != null) {
+          await setLocaleIdentifier(localeIdentifier);
+        }
+        
         final placemarks = await placemarkFromCoordinates(
           position.latitude,
           position.longitude,
@@ -125,9 +129,15 @@ class LocationService {
 
   /// Reverse geocode coordinates to get village/locality name.
   Future<String> getVillageFromCoordinates(
-      double latitude, double longitude) async {
+      double latitude, double longitude, {String? localeIdentifier}) async {
     try {
-      final placemarks = await placemarkFromCoordinates(latitude, longitude);
+      if (localeIdentifier != null) {
+        await setLocaleIdentifier(localeIdentifier);
+      }
+      final placemarks = await placemarkFromCoordinates(
+        latitude, 
+        longitude, 
+      );
       if (placemarks.isEmpty) return 'Unknown';
       return _extractVillage(placemarks.first);
     } catch (e) {
@@ -136,9 +146,16 @@ class LocationService {
   }
 
   /// Get full address string from coordinates.
-  Future<String> getFullAddress(double latitude, double longitude) async {
+  Future<String> getFullAddress(
+      double latitude, double longitude, {String? localeIdentifier}) async {
     try {
-      final placemarks = await placemarkFromCoordinates(latitude, longitude);
+      if (localeIdentifier != null) {
+        await setLocaleIdentifier(localeIdentifier);
+      }
+      final placemarks = await placemarkFromCoordinates(
+        latitude, 
+        longitude,
+      );
       if (placemarks.isEmpty) return 'Unknown location';
       return _buildFullAddress(placemarks.first);
     } catch (e) {

@@ -6,8 +6,8 @@ import 'package:nanonmesh/main.dart';
 
 void main() {
   testWidgets('App launches successfully', (WidgetTester tester) async {
-    await tester.pumpWidget(const NanonMeshApp());
+    await tester.pumpWidget(const AgroSwapApp());
     // Verify splash screen shows
-    expect(find.text('NanonMesh'), findsOneWidget);
+    expect(find.text('AgroSwap'), findsOneWidget);
   });
 }

@@ -16,9 +16,8 @@ class OtpScreen extends StatefulWidget {
 
 class _OtpScreenState extends State<OtpScreen> {
   final _pinController = TextEditingController();
-  final _confirmPinController = TextEditingController();
+  String _firstPin = '';
   String _currentPin = '';
-  String _confirmPin = '';
   bool _isConfirmStep = false;
 
   void _handleSubmit() async {
@@ -29,14 +28,23 @@ class _OtpScreenState extends State<OtpScreen> {
       if (!_isConfirmStep) {
         // First entry — ask to confirm
         if (_currentPin.length != 4) return;
+        
         setState(() {
           _isConfirmStep = true;
-          _confirmPinController.clear();
-          _confirmPin = '';
+          _firstPin = _currentPin;
+        });
+
+        // Small delay so user sees the 4th digit typed before it clears
+        Future.delayed(const Duration(milliseconds: 150), () {
+          if (!mounted) return;
+          _pinController.clear();
+          setState(() {
+            _currentPin = '';
+          });
         });
       } else {
         // Confirm step — check match
-        if (_confirmPin != _currentPin) {
+        if (_currentPin != _firstPin) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('PINs do not match. Try again.'),
@@ -45,11 +53,10 @@ class _OtpScreenState extends State<OtpScreen> {
           );
           setState(() {
             _isConfirmStep = false;
-            _pinController.clear();
-            _confirmPinController.clear();
+            _firstPin = '';
             _currentPin = '';
-            _confirmPin = '';
           });
+          _pinController.clear();
           return;
         }
 
@@ -69,10 +76,10 @@ class _OtpScreenState extends State<OtpScreen> {
       final success = await appState.verifyPin(_currentPin);
       if (!mounted) return;
       if (success) {
+        // Existing user logs in straight to Home
         Navigator.pushReplacementNamed(
           context,
-          '/profile-setup',
-          arguments: widget.phoneNumber,
+          '/home',
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -90,7 +97,6 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   void dispose() {
     _pinController.dispose();
-    _confirmPinController.dispose();
     super.dispose();
   }
 
@@ -117,9 +123,16 @@ class _OtpScreenState extends State<OtpScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(gradient: AppTheme.heroGradient),
-        child: SafeArea(
-          child: SingleChildScrollView(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/splash_bg.jpg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.35),
+          child: SafeArea(
+            child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,9 +144,8 @@ class _OtpScreenState extends State<OtpScreen> {
                       setState(() {
                         _isConfirmStep = false;
                         _pinController.clear();
-                        _confirmPinController.clear();
+                        _firstPin = '';
                         _currentPin = '';
-                        _confirmPin = '';
                       });
                     } else {
                       Navigator.pop(context);
@@ -238,9 +250,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         PinCodeTextField(
                           appContext: context,
                           length: 4,
-                          controller: _isConfirmStep
-                              ? _confirmPinController
-                              : _pinController,
+                          controller: _pinController,
                           obscureText: true,
                           obscuringCharacter: '●',
                           animationType: AnimationType.scale,
@@ -265,19 +275,11 @@ class _OtpScreenState extends State<OtpScreen> {
                           keyboardType: TextInputType.number,
                           onChanged: (value) {
                             setState(() {
-                              if (_isConfirmStep) {
-                                _confirmPin = value;
-                              } else {
-                                _currentPin = value;
-                              }
+                              _currentPin = value;
                             });
                           },
                           onCompleted: (value) {
-                            if (_isConfirmStep) {
-                              _confirmPin = value;
-                            } else {
-                              _currentPin = value;
-                            }
+                            _currentPin = value;
                             _handleSubmit();
                           },
                         ),
@@ -289,10 +291,7 @@ class _OtpScreenState extends State<OtpScreen> {
                             onPressed: isLoading
                                 ? null
                                 : () {
-                                    final pin = _isConfirmStep
-                                        ? _confirmPin
-                                        : _currentPin;
-                                    if (pin.length == 4) _handleSubmit();
+                                    if (_currentPin.length == 4) _handleSubmit();
                                   },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.primaryGreen,
@@ -347,6 +346,7 @@ class _OtpScreenState extends State<OtpScreen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

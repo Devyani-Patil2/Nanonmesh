@@ -34,8 +34,8 @@ class NotificationService {
     if (!_initialized) await init();
 
     const androidDetails = AndroidNotificationDetails(
-      'nanonmesh_channel',
-      'Nanonmesh Alerts',
+      'agroswap_channel',
+      'AgroSwap Alerts',
       channelDescription: 'Trade and exchange notifications',
       importance: Importance.high,
       priority: Priority.high,
