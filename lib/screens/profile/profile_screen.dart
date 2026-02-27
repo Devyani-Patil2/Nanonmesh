@@ -6,6 +6,7 @@ import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 import '../../config/theme.dart';
 import '../../providers/app_state.dart';
+import '../../services/supply_chain_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -213,6 +214,72 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
 
+                  // Language Toggle
+                  FadeInUp(
+                    delay: const Duration(milliseconds: 150),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppTheme.skyBlue.withValues(alpha: 0.1),
+                            AppTheme.primaryGreen.withValues(alpha: 0.1),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.translate, color: AppTheme.skyBlue, size: 22),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Language / भाषा',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  appState.locale.languageCode == 'en'
+                                      ? 'English'
+                                      : 'हिन्दी',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => appState.toggleLocale(),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryGreen,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              appState.locale.languageCode == 'en'
+                                  ? 'हिन्दी में बदलें'
+                                  : 'Switch to English',
+                              style: GoogleFonts.inter(
+                                  fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   // Menu Items
                   FadeInUp(
                     delay: const Duration(milliseconds: 200),
@@ -247,6 +314,25 @@ class ProfileScreen extends StatelessWidget {
                           _divider(),
                           _menuItem(context, Icons.camera_alt_outlined, 'Quality Check', () {
                             Navigator.pushNamed(context, '/quality-check');
+                          }),
+                          _divider(),
+                          _menuItem(context, Icons.bar_chart_rounded, 'Mandi Prices', () {
+                            Navigator.pushNamed(context, '/price-discovery');
+                          }),
+                          _divider(),
+                          _menuItem(context, Icons.upload_file_rounded, 'Export Data for FPO', () async {
+                            if (user == null) return;
+                            final data = await SupplyChainService.instance
+                                .generateFPODataPackage(
+                              user: user,
+                              trades: appState.trades,
+                              listings: appState.listings,
+                              transactions: appState.transactions,
+                            );
+                            await SupplyChainService.instance.shareReport(
+                              'Nanonmesh FPO Report - ${user.name}',
+                              data,
+                            );
                           }),
                         ],
                       ),

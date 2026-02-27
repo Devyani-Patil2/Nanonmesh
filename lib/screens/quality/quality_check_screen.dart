@@ -1,9 +1,10 @@
-import 'dart:math';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../config/theme.dart';
 import '../../providers/app_state.dart';
 import '../../models/evidence_model.dart';
@@ -18,19 +19,72 @@ class QualityCheckScreen extends StatefulWidget {
 class _QualityCheckScreenState extends State<QualityCheckScreen> {
   EvidenceModel? _report;
   bool _isAnalyzing = false;
+  File? _capturedImage;
+  final _picker = ImagePicker();
 
-  void _simulateCapture() async {
-    setState(() => _isAnalyzing = true);
+  /// Capture a REAL photo using the device camera and analyze it.
+  void _captureAndAnalyze() async {
+    // Open real camera
+    final XFile? photo = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
 
-    // Simulate AI analysis delay
-    await Future.delayed(const Duration(seconds: 2));
+    if (photo == null || !mounted) return;
+
+    setState(() {
+      _isAnalyzing = true;
+      _capturedImage = File(photo.path);
+    });
+
+    // Read real image bytes
+    final imageBytes = await File(photo.path).readAsBytes();
+
+    if (!mounted) return;
+
+    // Real image analysis (not random!)
+    final appState = context.read<AppState>();
+    final report = await appState.generateQualityScoreFromImage(
+      tradeId: 'quality_${DateTime.now().millisecondsSinceEpoch}',
+      farmerId: appState.currentUser?.id ?? '',
+      imageBytes: imageBytes,
+      photoUrl: photo.path,
+    );
+
+    setState(() {
+      _report = report;
+      _isAnalyzing = false;
+    });
+  }
+
+  /// Pick from gallery for testing.
+  void _pickFromGallery() async {
+    final XFile? photo = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
+
+    if (photo == null || !mounted) return;
+
+    setState(() {
+      _isAnalyzing = true;
+      _capturedImage = File(photo.path);
+    });
+
+    final imageBytes = await File(photo.path).readAsBytes();
 
     if (!mounted) return;
 
     final appState = context.read<AppState>();
-    final report = appState.generateQualityScore(
-      tradeId: 'demo_${Random().nextInt(1000)}',
+    final report = await appState.generateQualityScoreFromImage(
+      tradeId: 'quality_${DateTime.now().millisecondsSinceEpoch}',
       farmerId: appState.currentUser?.id ?? '',
+      imageBytes: imageBytes,
+      photoUrl: photo.path,
     );
 
     setState(() {
@@ -58,7 +112,7 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
             // Camera/Capture Section
             FadeInDown(
               child: GestureDetector(
-                onTap: _isAnalyzing ? null : _simulateCapture,
+                onTap: _isAnalyzing ? null : _captureAndAnalyze,
                 child: Container(
                   width: double.infinity,
                   height: 220,
@@ -70,69 +124,100 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                       width: 2,
                       strokeAlign: BorderSide.strokeAlignOutside,
                     ),
+                    image: _capturedImage != null
+                        ? DecorationImage(
+                            image: FileImage(_capturedImage!),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
                   child: _isAnalyzing
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const CircularProgressIndicator(
-                              color: AppTheme.primaryGreen,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'AI Analyzing Produce...',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
+                      ? Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircularProgressIndicator(
                                 color: AppTheme.primaryGreen,
-                                fontWeight: FontWeight.w600,
                               ),
-                            ),
-                            Text(
-                              'Checking freshness, damage, color, size',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: Colors.grey.shade500,
+                              const SizedBox(height: 16),
+                              Text(
+                                'AI Analyzing Produce...',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  color: AppTheme.primaryGreen,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                          ],
+                              Text(
+                                'Checking freshness, damage, color, size',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
+                          ),
                         )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.camera_alt_rounded,
-                                size: 32,
-                                color: AppTheme.primaryGreen,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Tap to Capture & Analyze',
-                              style: GoogleFonts.outfit(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.primaryGreen,
-                              ),
-                            ),
-                            Text(
-                              'Take a photo of your produce',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
-                        ),
+                      : _capturedImage == null
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.camera_alt_rounded,
+                                    size: 32,
+                                    color: AppTheme.primaryGreen,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Tap to Capture & Analyze',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.primaryGreen,
+                                  ),
+                                ),
+                                Text(
+                                  'Take a photo of your produce',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : null,
                 ),
               ),
             ),
+            // Gallery option
+            if (!_isAnalyzing)
+              FadeInUp(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Center(
+                    child: TextButton.icon(
+                      onPressed: _pickFromGallery,
+                      icon: const Icon(Icons.photo_library_outlined, size: 18),
+                      label: Text(
+                        'Or pick from gallery',
+                        style: GoogleFonts.inter(fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             const SizedBox(height: 24),
 
             // AI Report
@@ -274,7 +359,7 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _simulateCapture,
+                        onPressed: _captureAndAnalyze,
                         icon: const Icon(Icons.refresh, size: 18),
                         label: Text('Re-analyze', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                         style: OutlinedButton.styleFrom(

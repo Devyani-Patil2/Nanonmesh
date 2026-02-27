@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'config/theme.dart';
 import 'providers/app_state.dart';
 import 'models/listing_model.dart';
 import 'models/trade_model.dart';
+import 'services/app_localization.dart';
+import 'services/notification_service.dart';
 
 // Screens
 import 'screens/splash/splash_screen.dart';
@@ -22,8 +25,9 @@ import 'screens/disputes/disputes_screen.dart';
 import 'screens/quality/quality_check_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/urgent/urgent_requests_screen.dart';
+import 'screens/prices/price_discovery_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
@@ -32,6 +36,8 @@ void main() {
       statusBarIconBrightness: Brightness.light,
     ),
   );
+  // Initialize notifications
+  await NotificationService.instance.init();
   runApp(const NanonMeshApp());
 }
 
@@ -42,48 +48,62 @@ class NanonMeshApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => AppState(),
-      child: MaterialApp(
-        title: 'NanonMesh',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        initialRoute: '/',
-        onGenerateRoute: (settings) {
-          switch (settings.name) {
-            case '/':
-              return _fadeRoute(const SplashScreen());
-            case '/login':
-              return _slideRoute(const LoginScreen());
-            case '/otp':
-              final phone = settings.arguments as String? ?? '';
-              return _slideRoute(OtpScreen(phoneNumber: phone));
-            case '/profile-setup':
-              final phone = settings.arguments as String? ?? '';
-              return _slideRoute(ProfileSetupScreen(phoneNumber: phone));
-            case '/home':
-              return _fadeRoute(const MainShell());
-            case '/create-listing':
-              return _slideRoute(const CreateListingScreen());
-            case '/listing-detail':
-              final listing = settings.arguments as ListingModel;
-              return _slideRoute(ListingDetailScreen(listing: listing));
-            case '/listings':
-              return _slideRoute(const ListingsScreen());
-            case '/trades':
-              return _slideRoute(const TradesScreen());
-            case '/trade-detail':
-              final trade = settings.arguments as TradeModel;
-              return _slideRoute(TradeDetailScreen(trade: trade));
-            case '/wallet':
-              return _slideRoute(const WalletScreen());
-            case '/disputes':
-              return _slideRoute(const DisputesScreen());
-            case '/quality-check':
-              return _slideRoute(const QualityCheckScreen());
-            case '/urgent-requests':
-              return _slideRoute(const UrgentRequestsScreen());
-            default:
-              return _fadeRoute(const SplashScreen());
-          }
+      child: Consumer<AppState>(
+        builder: (context, appState, _) {
+          return MaterialApp(
+            title: 'NanonMesh',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            locale: appState.locale,
+            supportedLocales: AppLocalization.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalization.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            initialRoute: '/',
+            onGenerateRoute: (settings) {
+              switch (settings.name) {
+                case '/':
+                  return _fadeRoute(const SplashScreen());
+                case '/login':
+                  return _slideRoute(const LoginScreen());
+                case '/otp':
+                  final phone = settings.arguments as String? ?? '';
+                  return _slideRoute(OtpScreen(phoneNumber: phone));
+                case '/profile-setup':
+                  final phone = settings.arguments as String? ?? '';
+                  return _slideRoute(ProfileSetupScreen(phoneNumber: phone));
+                case '/home':
+                  return _fadeRoute(const MainShell());
+                case '/create-listing':
+                  return _slideRoute(const CreateListingScreen());
+                case '/listing-detail':
+                  final listing = settings.arguments as ListingModel;
+                  return _slideRoute(ListingDetailScreen(listing: listing));
+                case '/listings':
+                  return _slideRoute(const ListingsScreen());
+                case '/trades':
+                  return _slideRoute(const TradesScreen());
+                case '/trade-detail':
+                  final trade = settings.arguments as TradeModel;
+                  return _slideRoute(TradeDetailScreen(trade: trade));
+                case '/wallet':
+                  return _slideRoute(const WalletScreen());
+                case '/disputes':
+                  return _slideRoute(const DisputesScreen());
+                case '/quality-check':
+                  return _slideRoute(const QualityCheckScreen());
+                case '/urgent-requests':
+                  return _slideRoute(const UrgentRequestsScreen());
+                case '/price-discovery':
+                  return _slideRoute(const PriceDiscoveryScreen());
+                default:
+                  return _fadeRoute(const SplashScreen());
+              }
+            },
+          );
         },
       ),
     );

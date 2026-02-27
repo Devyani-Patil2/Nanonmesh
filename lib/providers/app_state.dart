@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -10,6 +11,13 @@ import '../models/dispute_model.dart';
 import '../models/credit_transaction_model.dart';
 import '../models/urgent_request_model.dart';
 import '../config/constants.dart';
+import '../services/database_helper.dart';
+import '../services/location_service.dart';
+import '../services/mandi_price_service.dart';
+import '../services/quality_analysis_service.dart';
+import '../services/image_comparison_service.dart';
+import '../services/notification_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 /// Central application state using ChangeNotifier (Provider pattern).
 /// In a production app, this would connect to Firebase/Supabase.
@@ -25,13 +33,16 @@ class AppState extends ChangeNotifier {
   List<UserModel> _users = [];
   List<ListingModel> _listings = [];
   List<TradeModel> _trades = [];
-  final List<EvidenceModel> _evidence = [];
-  final List<DisputeModel> _disputes = [];
+  List<EvidenceModel> _evidence = [];
+  List<DisputeModel> _disputes = [];
   List<CreditTransactionModel> _transactions = [];
   final List<UrgentRequestModel> _urgentRequests = [];
 
   // Navigation
   int _currentTabIndex = 0;
+
+  // Locale for multi-language
+  Locale _locale = const Locale('en', 'IN');
 
   // Getters
   bool get isAuthenticated => _isAuthenticated;
@@ -39,6 +50,8 @@ class AppState extends ChangeNotifier {
   UserModel? get currentUser => _currentUser;
   String? get verificationId => _verificationId;
   int get currentTabIndex => _currentTabIndex;
+  Locale get locale => _locale;
+  final _notifications = NotificationService.instance;
 
   List<UserModel> get users => _users;
   List<ListingModel> get listings => _listings;
@@ -69,6 +82,11 @@ class AppState extends ChangeNotifier {
 
   final _uuid = const Uuid();
   final _random = Random();
+  final _db = DatabaseHelper.instance;
+  final _location = LocationService.instance;
+  final _mandiPrices = MandiPriceService.instance;
+  final _qualityAnalysis = QualityAnalysisService.instance;
+  final _imageComparison = ImageComparisonService.instance;
 
   // ─── AUTHENTICATION ───────────────────────────────────────
 
@@ -109,24 +127,48 @@ class AppState extends ChangeNotifier {
     required String phone,
   }) async {
     final userId = _uuid.v4();
+
+    // Use REAL GPS location
+    double latitude = 0;
+    double longitude = 0;
+    String resolvedVillage = village;
+
+    final position = await _location.getCurrentPosition();
+    if (position != null) {
+      latitude = position.latitude;
+      longitude = position.longitude;
+      // If village is empty or default, use reverse geocoding
+      if (village.isEmpty || village == 'Unknown') {
+        resolvedVillage =
+            await _location.getVillageFromCoordinates(latitude, longitude);
+      }
+    }
+
     _currentUser = UserModel(
       id: userId,
       phone: phone,
       name: name,
-      village: village,
-      latitude: 26.85 + _random.nextDouble() * 0.5,
-      longitude: 80.91 + _random.nextDouble() * 0.5,
+      village: resolvedVillage,
+      latitude: latitude,
+      longitude: longitude,
       reputationScore: 75.0,
       creditBalance: AppConstants.initialCreditBalance,
     );
 
-    // Save login state
+    // Save login state (auth stays on SharedPreferences)
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('userId', userId);
     await prefs.setString('userName', name);
 
-    // Load seed data after setup
-    _loadSeedData();
+    // Persist user to SQLite
+    await _db.insertUser(_currentUser!);
+
+    // Seed mandi prices into SQLite and try to fetch latest from API
+    await _mandiPrices.seedDefaultPrices();
+    _mandiPrices.fetchLatestPrices(); // Fire and forget (non-blocking)
+
+    // Load seed data after setup (checks db first)
+    await _loadSeedData();
     notifyListeners();
   }
 
@@ -134,16 +176,30 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
     if (userId != null) {
-      final userName = prefs.getString('userName') ?? 'Farmer';
-      _currentUser = UserModel(
-        id: userId,
-        phone: '+91 9876543210',
-        name: userName,
-        village: 'Rampur',
-        creditBalance: AppConstants.initialCreditBalance,
-      );
+      // Try to load user from SQLite first
+      final dbUser = await _db.getUser(userId);
+      if (dbUser != null) {
+        _currentUser = dbUser;
+      } else {
+        final userName = prefs.getString('userName') ?? 'Farmer';
+        _currentUser = UserModel(
+          id: userId,
+          phone: '+91 9876543210',
+          name: userName,
+          village: 'Rampur',
+          creditBalance: AppConstants.initialCreditBalance,
+        );
+        await _db.insertUser(_currentUser!);
+      }
       _isAuthenticated = true;
-      _loadSeedData();
+
+      // Load all data from SQLite
+      await _loadDataFromDB();
+
+      // Seed if db is empty (first launch after auth)
+      if (_users.length <= 1) {
+        await _loadSeedData();
+      }
       notifyListeners();
     }
   }
@@ -151,6 +207,7 @@ class AppState extends ChangeNotifier {
   Future<void> signOut() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    await _db.clearAll();
     _isAuthenticated = false;
     _currentUser = null;
     _users.clear();
@@ -170,7 +227,59 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Toggle between English and Hindi.
+  void toggleLocale() {
+    _locale = _locale.languageCode == 'en'
+        ? const Locale('hi', 'IN')
+        : const Locale('en', 'IN');
+    notifyListeners();
+  }
+
+  /// Calculate distance in km between current user and a listing.
+  double getDistanceToListing(ListingModel listing) {
+    if (_currentUser == null) return 0;
+    return Geolocator.distanceBetween(
+      _currentUser!.latitude,
+      _currentUser!.longitude,
+      listing.latitude,
+      listing.longitude,
+    ) / 1000; // meters → km
+  }
+
+  /// Estimate transport cost based on distance (₹5/km baseline).
+  double estimateTransportCost(double distanceKm) {
+    if (distanceKm <= 5) return 0; // Free within 5 km
+    return (distanceKm - 5) * 5; // ₹5 per km above 5 km
+  }
+
+  /// Get listings sorted by proximity to the current user.
+  List<ListingModel> get activeListingsByDistance {
+    final list = activeListings;
+    list.sort((a, b) {
+      final distA = getDistanceToListing(a);
+      final distB = getDistanceToListing(b);
+      return distA.compareTo(distB);
+    });
+    return list;
+  }
+
   // ─── URGENT REQUESTS ──────────────────────────────────────
+
+  // ─── DATABASE LOADING ──────────────────────────────────────
+
+  /// Load all data from SQLite into memory
+  Future<void> _loadDataFromDB() async {
+    _users = await _db.getUsers();
+    _listings = await _db.getListings();
+    _trades = await _db.getTrades();
+    _evidence = List.from(await _db.getEvidence());
+    _disputes = List.from(await _db.getDisputes());
+    _transactions = await _db.getTransactions();
+    _urgentRequests.clear();
+    _urgentRequests.addAll(await _db.getUrgentRequests());
+  }
+
+  // ─── URGENT REQUEST ACTIONS ───────────────────────────────
 
   /// Post an urgent request. The requester is willing to spend credits
   /// to get something they need right now.
@@ -201,6 +310,7 @@ class AppState extends ChangeNotifier {
     );
 
     _urgentRequests.insert(0, request);
+    _db.insertUrgentRequest(request);
     notifyListeners();
   }
 
@@ -284,6 +394,17 @@ class AppState extends ChangeNotifier {
         timestamp: DateTime.now(),
       ),
     );
+    // Persist all changes to SQLite
+    _db.updateUrgentRequest(_urgentRequests[index]);
+    _db.updateUser(_currentUser!);
+    if (requesterIndex != -1) {
+      _db.updateUser(_users[requesterIndex]);
+    }
+    _db.insertTransaction(_transactions[0]);
+    _db.insertTransaction(_transactions[1]);
+
+    // 🔔 Notify about urgent request fulfillment
+    _notifications.notifyRequestFulfilled(request.productNeeded);
 
     notifyListeners();
   }
@@ -296,6 +417,7 @@ class AppState extends ChangeNotifier {
     if (_urgentRequests[index].status != 'open') return;
 
     _urgentRequests[index] = _urgentRequests[index].copyWith(status: 'cancelled');
+    _db.updateUrgentRequest(_urgentRequests[index]);
     notifyListeners();
   }
 
@@ -303,6 +425,7 @@ class AppState extends ChangeNotifier {
 
   void addListing(ListingModel listing) {
     _listings.insert(0, listing);
+    _db.insertListing(listing);
     notifyListeners();
     // After adding, check for trade loops
     _checkForTradeLoops();
@@ -312,6 +435,7 @@ class AppState extends ChangeNotifier {
     final index = _listings.indexWhere((l) => l.id == listingId);
     if (index != -1) {
       _listings[index] = _listings[index].copyWith(status: status);
+      _db.updateListingStatus(listingId, status);
       notifyListeners();
     }
   }
@@ -415,6 +539,14 @@ class AppState extends ChangeNotifier {
     );
 
     _trades.insert(0, trade);
+    _db.insertTrade(trade);
+
+    // 🔔 Notify about new trade match
+    final productFlow = participants
+        .map((p) => p.offerProduct)
+        .join(' → ');
+    _notifications.notifyTradeMatched(productFlow);
+
     notifyListeners();
   }
 
@@ -455,6 +587,7 @@ class AppState extends ChangeNotifier {
       _executeTrade(loopId);
     }
 
+    _db.updateTrade(_trades[tradeIndex]);
     notifyListeners();
   }
 
@@ -469,6 +602,7 @@ class AppState extends ChangeNotifier {
       updateListingStatus(p.listingId, 'active');
     }
 
+    _db.updateTrade(_trades[tradeIndex]);
     notifyListeners();
   }
 
@@ -526,74 +660,220 @@ class AppState extends ChangeNotifier {
         reputationScore:
             min(100, _currentUser!.reputationScore + 2.0),
       );
+      _db.updateUser(_currentUser!);
     }
+
+    _db.updateTrade(_trades[tradeIndex]);
+    for (final txn in _transactions) {
+      _db.insertTransaction(txn);
+    }
+
+    // 🔔 Notify about trade completion
+    final tradeProducts = trade.participants
+        .map((p) => p.offerProduct)
+        .join(', ');
+    _notifications.notifyTradeCompleted(tradeProducts);
 
     notifyListeners();
   }
 
   // ─── VALUATION ENGINE ─────────────────────────────────────
 
+  /// Calculate valuation using REAL mandi prices from API/SQLite
+  /// and REAL demand factor from actual listing supply/demand.
+  Future<double> _calculateValuationAsync(
+      String productType, double quantity, double qualityScore) async {
+    // Get real mandi price (from API cache in SQLite)
+    final basePrice = await _mandiPrices.getPrice(productType);
+    final qualityFactor = qualityScore / 100.0;
+
+    // Real demand factor: based on actual supply/demand in listings
+    final demandFactor = _calculateRealDemandFactor(productType);
+
+    return basePrice * quantity * qualityFactor * demandFactor;
+  }
+
+  /// Synchronous fallback (used where async isn't practical)
   double _calculateValuation(
       String productType, double quantity, double qualityScore) {
     final basePrice =
         AppConstants.mandiPrices[productType] ?? 50.0;
     final qualityFactor = qualityScore / 100.0;
-    final demandFactor = 0.8 + _random.nextDouble() * 0.4; // 0.8–1.2
+    final demandFactor = _calculateRealDemandFactor(productType);
     return basePrice * quantity * qualityFactor * demandFactor;
   }
 
-  double getValuation(String productType, double quantity,
+  /// Calculate REAL demand factor based on actual listing data.
+  /// demand = (number wanting this product) / (number offering this product)
+  double _calculateRealDemandFactor(String productType) {
+    final active = activeListings;
+    if (active.isEmpty) return 1.0;
+
+    // Count how many people WANT this product
+    final demandCount = active
+        .where((l) => l.desiredProduct.toLowerCase() == productType.toLowerCase())
+        .length;
+
+    // Count how many people OFFER this product
+    final supplyCount = active
+        .where((l) => l.productType.toLowerCase() == productType.toLowerCase())
+        .length;
+
+    if (supplyCount == 0 && demandCount == 0) return 1.0;
+    if (supplyCount == 0) return 1.5; // High demand, no supply → premium
+    if (demandCount == 0) return 0.7; // No demand → discount
+
+    // Demand/supply ratio, clamped to reasonable range [0.5, 2.0]
+    final ratio = demandCount / supplyCount;
+    return ratio.clamp(0.5, 2.0);
+  }
+
+  Future<double> getValuation(String productType, double quantity,
+      {double qualityScore = 85.0}) async {
+    return _calculateValuationAsync(productType, quantity, qualityScore);
+  }
+
+  /// Synchronous version for cases where async isn't possible
+  double getValuationSync(String productType, double quantity,
       {double qualityScore = 85.0}) {
     return _calculateValuation(productType, quantity, qualityScore);
   }
 
-  // ─── AI QUALITY SCORING ───────────────────────────────────
+  // ─── AI QUALITY SCORING (REAL IMAGE ANALYSIS) ─────────────
 
-  EvidenceModel generateQualityScore({
+  /// Analyze a real crop photo for quality scoring.
+  /// Uses pixel-level analysis: brightness, saturation, green ratio,
+  /// brown ratio, uniformity — NOT random numbers.
+  Future<EvidenceModel> generateQualityScoreFromImage({
     required String tradeId,
     required String farmerId,
+    required Uint8List imageBytes,
     String? photoUrl,
-  }) {
-    // Simulated AI quality scoring for hackathon
-    final freshness = 60.0 + _random.nextDouble() * 40;
-    final damage = 70.0 + _random.nextDouble() * 30;
-    final color = 65.0 + _random.nextDouble() * 35;
-    final size = 55.0 + _random.nextDouble() * 45;
-    final overall = (freshness + damage + color + size) / 4;
-
-    String conditionTag;
-    if (overall >= 85) {
-      conditionTag = 'Excellent';
-    } else if (overall >= 70) {
-      conditionTag = 'Good';
-    } else if (overall >= 50) {
-      conditionTag = 'Average';
-    } else {
-      conditionTag = 'Poor';
-    }
+  }) async {
+    // Real image analysis
+    final analysis = _qualityAnalysis.analyzeImageBytes(imageBytes);
 
     final evidence = EvidenceModel(
       id: _uuid.v4(),
       tradeId: tradeId,
       farmerId: farmerId,
       photoUrl: photoUrl,
-      aiQualityScore: overall,
-      conditionTag: conditionTag,
-      freshnessScore: freshness,
-      damageScore: damage,
-      colorScore: color,
-      sizeScore: size,
+      aiQualityScore: analysis['overall'] as double,
+      conditionTag: analysis['conditionTag'] as String,
+      freshnessScore: analysis['freshness'] as double,
+      damageScore: analysis['damage'] as double,
+      colorScore: analysis['color'] as double,
+      sizeScore: analysis['size'] as double,
       latitude: _currentUser?.latitude ?? 0,
       longitude: _currentUser?.longitude ?? 0,
     );
 
     _evidence.add(evidence);
+    _db.insertEvidence(evidence);
     notifyListeners();
     return evidence;
   }
 
-  // ─── DISPUTE SYSTEM ───────────────────────────────────────
+  /// Fallback: generate quality score without an image (uses defaults).
+  EvidenceModel generateQualityScore({
+    required String tradeId,
+    required String farmerId,
+    String? photoUrl,
+  }) {
+    // Without image, use conservative defaults
+    final evidence = EvidenceModel(
+      id: _uuid.v4(),
+      tradeId: tradeId,
+      farmerId: farmerId,
+      photoUrl: photoUrl,
+      aiQualityScore: 70.0,
+      conditionTag: 'Good',
+      freshnessScore: 70.0,
+      damageScore: 75.0,
+      colorScore: 65.0,
+      sizeScore: 70.0,
+      latitude: _currentUser?.latitude ?? 0,
+      longitude: _currentUser?.longitude ?? 0,
+    );
 
+    _evidence.add(evidence);
+    _db.insertEvidence(evidence);
+    notifyListeners();
+    return evidence;
+  }
+
+  // ─── DISPUTE SYSTEM (REAL IMAGE COMPARISON) ────────────────
+
+  /// File a dispute with REAL image comparison when photos are provided.
+  Future<DisputeModel> fileDisputeWithImages({
+    required String tradeId,
+    required String respondentId,
+    required String respondentName,
+    required String description,
+    Uint8List? complaintImageBytes,
+    Uint8List? deliveryImageBytes,
+    String? complaintPhotoUrl,
+    String? deliveryPhotoUrl,
+  }) async {
+    double similarity = 50.0;
+    String verdict = 'manual_review';
+    double refund = 0;
+
+    // Real image comparison if both photos provided
+    if (complaintImageBytes != null && deliveryImageBytes != null) {
+      final result = _imageComparison.compareImageBytes(
+        complaintImageBytes,
+        deliveryImageBytes,
+      );
+      similarity = result['similarity'] as double;
+      verdict = result['verdict'] as String;
+      refund = (result['refundAmount'] as num?)?.toDouble() ?? 0;
+    } else {
+      // Without both images, base on description severity
+      if (description.toLowerCase().contains('damaged') ||
+          description.toLowerCase().contains('rotten') ||
+          description.toLowerCase().contains('wrong')) {
+        similarity = 30.0;
+        verdict = 'valid_complaint';
+        refund = 500;
+      } else {
+        similarity = 60.0;
+        verdict = 'partial_refund';
+        refund = 250;
+      }
+    }
+
+    final dispute = DisputeModel(
+      id: _uuid.v4(),
+      tradeId: tradeId,
+      complainantId: _currentUser?.id ?? '',
+      complainantName: _currentUser?.name ?? '',
+      respondentId: respondentId,
+      respondentName: respondentName,
+      complaintPhotoUrl: complaintPhotoUrl,
+      deliveryPhotoUrl: deliveryPhotoUrl,
+      description: description,
+      aiSimilarityScore: similarity,
+      aiVerdict: verdict,
+      refundAmount: refund,
+      status: 'under_review',
+    );
+
+    _disputes.add(dispute);
+
+    if (_currentUser != null) {
+      _currentUser = _currentUser!.copyWith(
+        disputeCount: _currentUser!.disputeCount + 1,
+      );
+      _db.updateUser(_currentUser!);
+    }
+
+    _db.insertDispute(dispute);
+    notifyListeners();
+    return dispute;
+  }
+
+  /// Legacy fallback without image bytes
   DisputeModel fileDispute({
     required String tradeId,
     required String respondentId,
@@ -602,22 +882,38 @@ class AppState extends ChangeNotifier {
     String? complaintPhotoUrl,
     String? deliveryPhotoUrl,
   }) {
-    // AI comparison simulation
-    final similarity = 40.0 + _random.nextDouble() * 60;
+    // Text-based analysis when no image bytes available
+    double similarity = 60.0;
     String verdict;
     double refund = 0;
 
-    if (similarity < 50) {
+    // Analyze description text for severity keywords
+    final descLower = description.toLowerCase();
+    final severityKeywords = ['damaged', 'rotten', 'broken', 'wrong', 'bad', 'spoiled', 'fake'];
+    final moderateKeywords = ['different', 'less', 'quality', 'size', 'color'];
+
+    final severeCount = severityKeywords.where((k) => descLower.contains(k)).length;
+    final moderateCount = moderateKeywords.where((k) => descLower.contains(k)).length;
+
+    if (severeCount >= 2) {
+      similarity = 25.0;
       verdict = 'valid_complaint';
       refund = 500;
-    } else if (similarity < 70) {
+    } else if (severeCount >= 1) {
+      similarity = 40.0;
+      verdict = 'valid_complaint';
+      refund = 500;
+    } else if (moderateCount >= 2) {
+      similarity = 55.0;
       verdict = 'partial_refund';
       refund = 250;
-    } else if (similarity < 85) {
-      verdict = 'false_complaint';
-      refund = 0;
+    } else if (moderateCount >= 1) {
+      similarity = 65.0;
+      verdict = 'partial_refund';
+      refund = 250;
     } else {
-      verdict = 'full_penalty';
+      similarity = 75.0;
+      verdict = 'false_complaint';
       refund = 0;
     }
 
@@ -639,13 +935,14 @@ class AppState extends ChangeNotifier {
 
     _disputes.add(dispute);
 
-    // Update reputation
     if (_currentUser != null) {
       _currentUser = _currentUser!.copyWith(
         disputeCount: _currentUser!.disputeCount + 1,
       );
+      _db.updateUser(_currentUser!);
     }
 
+    _db.insertDispute(dispute);
     notifyListeners();
     return dispute;
   }
@@ -670,6 +967,7 @@ class AppState extends ChangeNotifier {
         refundAmount: _disputes[index].refundAmount,
         resolvedAt: DateTime.now(),
       );
+      _db.updateDispute(_disputes[index]);
       notifyListeners();
     }
   }
@@ -695,7 +993,10 @@ class AppState extends ChangeNotifier {
 
   // ─── SEED DATA ────────────────────────────────────────────
 
-  void _loadSeedData() {
+  Future<void> _loadSeedData() async {
+    // Check if seed data already in db
+    final hasData = await _db.hasSeedData();
+    if (hasData) return;
     // Create sample farmers
     _users = [
       ?_currentUser,
@@ -962,6 +1263,24 @@ class AppState extends ChangeNotifier {
 
     // Run matching engine on seed data
     _checkForTradeLoops();
+
+    // Persist all seed data to SQLite
+    for (final user in _users) {
+      await _db.insertUser(user);
+    }
+    for (final listing in _listings) {
+      await _db.insertListing(listing);
+    }
+    for (final trade in _trades) {
+      await _db.insertTrade(trade);
+    }
+    for (final txn in _transactions) {
+      await _db.insertTransaction(txn);
+    }
+    for (final req in _urgentRequests) {
+      await _db.insertUrgentRequest(req);
+    }
+
     notifyListeners();
   }
 }

@@ -3,8 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
-import '../../config/constants.dart';
 import '../../providers/app_state.dart';
+import '../../services/location_service.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   final String phoneNumber;
@@ -16,8 +16,43 @@ class ProfileSetupScreen extends StatefulWidget {
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _nameController = TextEditingController();
-  String _selectedVillage = AppConstants.sampleVillages.first;
+  final _villageController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _isDetectingLocation = false;
+  String _locationStatus = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-detect village from GPS
+    _detectLocation();
+  }
+
+  /// Use real GPS to auto-fill village name.
+  Future<void> _detectLocation() async {
+    setState(() {
+      _isDetectingLocation = true;
+      _locationStatus = 'Detecting your location...';
+    });
+
+    final position = await LocationService.instance.getCurrentPosition();
+    if (position != null && mounted) {
+      final village = await LocationService.instance
+          .getVillageFromCoordinates(position.latitude, position.longitude);
+      if (mounted) {
+        setState(() {
+          _villageController.text = village;
+          _isDetectingLocation = false;
+          _locationStatus = 'Location detected ✓';
+        });
+      }
+    } else if (mounted) {
+      setState(() {
+        _isDetectingLocation = false;
+        _locationStatus = 'Could not detect location. Enter manually.';
+      });
+    }
+  }
 
   void _setupProfile() async {
     if (!_formKey.currentState!.validate()) return;
@@ -25,7 +60,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final appState = context.read<AppState>();
     await appState.setupProfile(
       name: _nameController.text.trim(),
-      village: _selectedVillage,
+      village: _villageController.text.trim(),
       phone: widget.phoneNumber,
     );
 
@@ -36,6 +71,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _villageController.dispose();
     super.dispose();
   }
 
@@ -144,38 +180,99 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             },
                           ),
                           const SizedBox(height: 24),
-                          // Village Selection
-                          Text(
-                            'Your Village',
-                            style: GoogleFonts.outfit(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade800,
-                            ),
+                          // Village Input (real GPS + manual entry)
+                          Row(
+                            children: [
+                              Text(
+                                'Your Village',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade800,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (_isDetectingLocation)
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppTheme.primaryGreen,
+                                  ),
+                                )
+                              else
+                                GestureDetector(
+                                  onTap: _detectLocation,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.my_location,
+                                        size: 16,
+                                        color: AppTheme.primaryGreen,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Auto-detect',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          color: AppTheme.primaryGreen,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
                           const SizedBox(height: 8),
-                          DropdownButtonFormField<String>(
-                            initialValue: _selectedVillage,
-                            isDense: false,
+                          TextFormField(
+                            controller: _villageController,
+                            textCapitalization: TextCapitalization.words,
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
                             decoration: InputDecoration(
                               prefixIcon: Icon(
                                 Icons.location_on_outlined,
                                 color: Colors.grey.shade500,
                               ),
+                              hintText: 'Enter your village name',
+                              suffixIcon: _isDetectingLocation
+                                  ? Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.grey.shade400,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
                             ),
-                            items: AppConstants.sampleVillages.map((v) {
-                              return DropdownMenuItem(
-                                value: v,
-                                child: Text(
-                                  v,
-                                  style: GoogleFonts.inter(fontSize: 16),
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() => _selectedVillage = value!);
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your village';
+                              }
+                              return null;
                             },
                           ),
+                          if (_locationStatus.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              _locationStatus,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: _locationStatus.contains('✓')
+                                    ? AppTheme.successGreen
+                                    : Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                           // Phone display
                           Container(

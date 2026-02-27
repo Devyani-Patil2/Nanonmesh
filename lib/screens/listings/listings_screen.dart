@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
 import '../../providers/app_state.dart';
+import '../../models/listing_model.dart';
 
 class ListingsScreen extends StatefulWidget {
   const ListingsScreen({super.key});
@@ -16,11 +17,19 @@ class ListingsScreen extends StatefulWidget {
 class _ListingsScreenState extends State<ListingsScreen> {
   String _filterProduct = 'All';
   bool _isGridView = false;
+  bool _sortByDistance = true; // Default: nearby first
 
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
-    var listings = appState.activeListings;
+    List<ListingModel> listings;
+
+    // Use distance-based sorting if enabled
+    if (_sortByDistance) {
+      listings = appState.activeListingsByDistance;
+    } else {
+      listings = appState.activeListings;
+    }
 
     if (_filterProduct != 'All') {
       listings = listings.where((l) => l.productType == _filterProduct).toList();
@@ -31,6 +40,12 @@ class _ListingsScreenState extends State<ListingsScreen> {
       appBar: AppBar(
         title: Text('Marketplace', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
         actions: [
+          // Sort toggle
+          IconButton(
+            icon: Icon(_sortByDistance ? Icons.near_me : Icons.sort),
+            tooltip: _sortByDistance ? 'Sorted: Nearest first' : 'Sort by time',
+            onPressed: () => setState(() => _sortByDistance = !_sortByDistance),
+          ),
           IconButton(
             icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
             onPressed: () => setState(() => _isGridView = !_isGridView),
@@ -43,6 +58,34 @@ class _ListingsScreenState extends State<ListingsScreen> {
       ),
       body: Column(
         children: [
+          // Distance sort indicator
+          if (_sortByDistance)
+            FadeInDown(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.near_me, size: 14, color: AppTheme.primaryGreen),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Showing nearest farmers first',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Filters
           SizedBox(
             height: 44,
@@ -78,7 +121,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          childAspectRatio: 0.85,
+                          childAspectRatio: 0.8,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),
@@ -86,7 +129,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
                         itemBuilder: (context, index) {
                           return FadeInUp(
                             delay: Duration(milliseconds: index * 80),
-                            child: _gridCard(context, listings[index]),
+                            child: _gridCard(context, listings[index], appState),
                           );
                         },
                       )
@@ -96,7 +139,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
                         itemBuilder: (context, index) {
                           return FadeInUp(
                             delay: Duration(milliseconds: index * 80),
-                            child: _listCard(context, listings[index]),
+                            child: _listCard(context, listings[index], appState),
                           );
                         },
                       ),
@@ -136,7 +179,10 @@ class _ListingsScreenState extends State<ListingsScreen> {
     );
   }
 
-  Widget _listCard(BuildContext context, listing) {
+  Widget _listCard(BuildContext context, ListingModel listing, AppState appState) {
+    final distanceKm = appState.getDistanceToListing(listing);
+    final transportCost = appState.estimateTransportCost(distanceKm);
+
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, '/listing-detail', arguments: listing),
       child: Container(
@@ -153,72 +199,147 @@ class _ListingsScreenState extends State<ListingsScreen> {
             ),
           ],
         ),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  AppConstants.productEmojis[listing.productType] ?? '📦',
-                  style: const TextStyle(fontSize: 26),
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    listing.productType,
-                    style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${listing.quantity} ${listing.unit} • ${listing.farmerVillage}',
-                    style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'by ${listing.farmerName}',
-                    style: GoogleFonts.inter(fontSize: 11, color: Colors.grey.shade400),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
-                    color: AppTheme.accentAmber.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(
-                    'Wants: ${listing.desiredProduct}',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.accentAmber,
+                  child: Center(
+                    child: Text(
+                      AppConstants.productEmojis[listing.productType] ?? '📦',
+                      style: const TextStyle(fontSize: 26),
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '₹${listing.valuationScore.toStringAsFixed(0)}',
-                  style: GoogleFonts.outfit(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.primaryGreen,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        listing.productType,
+                        style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${listing.quantity} ${listing.unit} • ${listing.farmerVillage}',
+                        style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'by ${listing.farmerName}',
+                        style: GoogleFonts.inter(fontSize: 11, color: Colors.grey.shade400),
+                      ),
+                    ],
                   ),
                 ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentAmber.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'Wants: ${listing.desiredProduct}',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.accentAmber,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '₹${listing.valuationScore.toStringAsFixed(0)}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    ),
+                  ],
+                ),
               ],
+            ),
+            // Distance & Transport Cost row
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    distanceKm <= 10 ? Icons.near_me : Icons.directions_car,
+                    size: 14,
+                    color: distanceKm <= 10
+                        ? AppTheme.successGreen
+                        : Colors.grey.shade500,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${distanceKm.toStringAsFixed(1)} km',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: distanceKm <= 10
+                          ? AppTheme.successGreen
+                          : Colors.grey.shade600,
+                    ),
+                  ),
+                  if (distanceKm <= 10) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppTheme.successGreen.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Nearby',
+                        style: GoogleFonts.inter(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.successGreen,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  if (transportCost > 0) ...[
+                    Icon(Icons.local_shipping_outlined,
+                        size: 13, color: Colors.grey.shade500),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Transport: ₹${transportCost.toStringAsFixed(0)}',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ] else
+                    Text(
+                      '🆓 Free delivery zone',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: AppTheme.successGreen,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ],
         ),
@@ -226,7 +347,9 @@ class _ListingsScreenState extends State<ListingsScreen> {
     );
   }
 
-  Widget _gridCard(BuildContext context, listing) {
+  Widget _gridCard(BuildContext context, ListingModel listing, AppState appState) {
+    final distanceKm = appState.getDistanceToListing(listing);
+
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, '/listing-detail', arguments: listing),
       child: Container(
@@ -276,6 +399,37 @@ class _ListingsScreenState extends State<ListingsScreen> {
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.primaryGreen,
+              ),
+            ),
+            const SizedBox(height: 4),
+            // Distance badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: distanceKm <= 10
+                    ? AppTheme.successGreen.withValues(alpha: 0.1)
+                    : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.near_me, size: 10,
+                      color: distanceKm <= 10
+                          ? AppTheme.successGreen
+                          : Colors.grey.shade500),
+                  const SizedBox(width: 3),
+                  Text(
+                    '${distanceKm.toStringAsFixed(1)} km',
+                    style: GoogleFonts.inter(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: distanceKm <= 10
+                          ? AppTheme.successGreen
+                          : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
