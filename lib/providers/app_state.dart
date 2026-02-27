@@ -248,7 +248,9 @@ class AppState extends ChangeNotifier {
     required String village,
     required String phone,
   }) async {
-    final userId = _uuid.v4();
+    // Check Firestore for existing user with same phone
+    final existingUsers = await _firestore.getUsers();
+    final existingUser = existingUsers.where((u) => u.phone == phone).toList();
 
     // Use REAL GPS location
     double latitude = 0;
@@ -259,27 +261,38 @@ class AppState extends ChangeNotifier {
     if (position != null) {
       latitude = position.latitude;
       longitude = position.longitude;
-      // If village is empty or default, use reverse geocoding
       if (village.isEmpty || village == 'Unknown') {
         resolvedVillage =
             await _location.getVillageFromCoordinates(latitude, longitude);
       }
     }
 
-    _currentUser = UserModel(
-      id: userId,
-      phone: phone,
-      name: name,
-      village: resolvedVillage,
-      latitude: latitude,
-      longitude: longitude,
-      reputationScore: 75.0,
-      creditBalance: AppConstants.initialCreditBalance,
-    );
+    if (existingUser.isNotEmpty) {
+      // Re-use existing user — restore their data!
+      _currentUser = existingUser.first.copyWith(
+        name: name,
+        village: resolvedVillage,
+        latitude: latitude,
+        longitude: longitude,
+      );
+    } else {
+      // Truly new user
+      final userId = _uuid.v4();
+      _currentUser = UserModel(
+        id: userId,
+        phone: phone,
+        name: name,
+        village: resolvedVillage,
+        latitude: latitude,
+        longitude: longitude,
+        reputationScore: 75.0,
+        creditBalance: AppConstants.initialCreditBalance,
+      );
+    }
 
     // Save login state (auth stays on SharedPreferences)
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('userId', userId);
+    await prefs.setString('userId', _currentUser!.id);
     await prefs.setString('userName', name);
 
     // Sync to Firestore for cross-device visibility
@@ -288,6 +301,9 @@ class AppState extends ChangeNotifier {
     // Seed mandi prices and try to fetch latest from API
     await _mandiPrices.seedDefaultPrices();
     _mandiPrices.fetchLatestPrices();
+
+    // Load existing data from Firestore
+    await _loadDataFromFirestore();
 
     // Start real-time listeners for cross-device sync
     _startListeningToFirestore();
@@ -1333,5 +1349,4 @@ class AppState extends ChangeNotifier {
             communityRating * AppConstants.weightCommunityRating) *
         100;
   }
-
 }

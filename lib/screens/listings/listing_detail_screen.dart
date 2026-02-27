@@ -23,13 +23,14 @@ class ListingDetailScreen extends StatelessWidget {
         appState.users.where((u) => u.id == listing.farmerId).toList();
     final reputation = farmer.isNotEmpty ? farmer.first.reputationScore : 75.0;
 
-    // Calculate fairness if user has a matching listing
+    // Find user's listing to trade with
     double? fairnessPercent;
     ListingModel? myMatchingListing;
+    ListingModel? myBestListing; // fallback: any active listing
     if (!isOwnListing && appState.currentUser != null) {
       final myListings =
           appState.myListings.where((l) => l.status == 'active').toList();
-      // Find my listing that matches this one (I want what they offer, or they want what I offer)
+      // First try: exact product match
       for (final ml in myListings) {
         if (ml.desiredProduct == listing.productType ||
             ml.productType == listing.desiredProduct) {
@@ -41,7 +42,17 @@ class ListingDetailScreen extends StatelessWidget {
           break;
         }
       }
+      // Fallback: use first active listing for trading
+      if (myMatchingListing == null && myListings.isNotEmpty) {
+        myBestListing = myListings.first;
+        fairnessPercent = appState.getFairnessPercent(
+          myBestListing.valuationScore,
+          listing.valuationScore,
+        );
+      }
     }
+    // The listing to use for trading (match preferred, fallback otherwise)
+    final myTradeListing = myMatchingListing ?? myBestListing;
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceLight,
@@ -355,8 +366,8 @@ class ListingDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // CONFIRM TRADE BUTTON (only for others' listings with a match)
-            if (!isOwnListing && myMatchingListing != null)
+            // CONFIRM TRADE BUTTON (for ALL other farmers' listings)
+            if (!isOwnListing && myTradeListing != null)
               FadeInUp(
                 delay: const Duration(milliseconds: 400),
                 child: SizedBox(
@@ -366,7 +377,7 @@ class ListingDetailScreen extends StatelessWidget {
                     onPressed: () => _showConfirmDialog(
                       context,
                       appState,
-                      myMatchingListing!,
+                      myTradeListing,
                       listing,
                       fairnessPercent ?? 0,
                     ),
@@ -387,6 +398,35 @@ class ListingDetailScreen extends StatelessWidget {
                       ),
                       elevation: 4,
                     ),
+                  ),
+                ),
+              ),
+            // Show message if user has no listings to trade
+            if (!isOwnListing && myTradeListing == null)
+              FadeInUp(
+                delay: const Duration(milliseconds: 400),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentAmber.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: AppTheme.accentAmber.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline,
+                          color: AppTheme.accentAmber),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Create your own listing first to trade with this farmer!',
+                          style: GoogleFonts.inter(
+                              fontSize: 13, color: Colors.grey.shade700),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

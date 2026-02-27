@@ -31,14 +31,22 @@ class _ListingsScreenState extends State<ListingsScreen> {
       listings = appState.activeListings;
     }
 
+    // Exclude own listings — marketplace only shows OTHER farmers
+    final myId = appState.currentUser?.id;
+    if (myId != null) {
+      listings = listings.where((l) => l.farmerId != myId).toList();
+    }
+
     if (_filterProduct != 'All') {
-      listings = listings.where((l) => l.productType == _filterProduct).toList();
+      listings =
+          listings.where((l) => l.productType == _filterProduct).toList();
     }
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceLight,
       appBar: AppBar(
-        title: Text('Marketplace', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+        title: Text('Marketplace',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
         actions: [
           // Sort toggle
           IconButton(
@@ -63,7 +71,8 @@ class _ListingsScreenState extends State<ListingsScreen> {
             FadeInDown(
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -71,7 +80,8 @@ class _ListingsScreenState extends State<ListingsScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.near_me, size: 14, color: AppTheme.primaryGreen),
+                    const Icon(Icons.near_me,
+                        size: 14, color: AppTheme.primaryGreen),
                     const SizedBox(width: 6),
                     Text(
                       'Showing nearest farmers first',
@@ -94,7 +104,9 @@ class _ListingsScreenState extends State<ListingsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 _filterChip('All'),
-                ...AppConstants.productCategories.take(10).map((p) => _filterChip(p)),
+                ...AppConstants.productCategories
+                    .take(10)
+                    .map((p) => _filterChip(p)),
               ],
             ),
           ),
@@ -107,11 +119,13 @@ class _ListingsScreenState extends State<ListingsScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.storefront, size: 64, color: Colors.grey.shade300),
+                        Icon(Icons.storefront,
+                            size: 64, color: Colors.grey.shade300),
                         const SizedBox(height: 12),
                         Text(
                           'No listings found',
-                          style: GoogleFonts.outfit(fontSize: 16, color: Colors.grey.shade500),
+                          style: GoogleFonts.outfit(
+                              fontSize: 16, color: Colors.grey.shade500),
                         ),
                       ],
                     ),
@@ -119,7 +133,8 @@ class _ListingsScreenState extends State<ListingsScreen> {
                 : _isGridView
                     ? GridView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           childAspectRatio: 0.8,
                           crossAxisSpacing: 12,
@@ -129,7 +144,8 @@ class _ListingsScreenState extends State<ListingsScreen> {
                         itemBuilder: (context, index) {
                           return FadeInUp(
                             delay: Duration(milliseconds: index * 80),
-                            child: _gridCard(context, listings[index], appState),
+                            child:
+                                _gridCard(context, listings[index], appState),
                           );
                         },
                       )
@@ -139,7 +155,8 @@ class _ListingsScreenState extends State<ListingsScreen> {
                         itemBuilder: (context, index) {
                           return FadeInUp(
                             delay: Duration(milliseconds: index * 80),
-                            child: _listCard(context, listings[index], appState),
+                            child:
+                                _listCard(context, listings[index], appState),
                           );
                         },
                       ),
@@ -166,7 +183,9 @@ class _ListingsScreenState extends State<ListingsScreen> {
           ),
           child: Center(
             child: Text(
-              label == 'All' ? '🌐 All' : '${AppConstants.productEmojis[label] ?? ''} $label',
+              label == 'All'
+                  ? '🌐 All'
+                  : '${AppConstants.productEmojis[label] ?? ''} $label',
               style: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -179,12 +198,14 @@ class _ListingsScreenState extends State<ListingsScreen> {
     );
   }
 
-  Widget _listCard(BuildContext context, ListingModel listing, AppState appState) {
+  Widget _listCard(
+      BuildContext context, ListingModel listing, AppState appState) {
     final distanceKm = appState.getDistanceToListing(listing);
     final transportCost = appState.estimateTransportCost(distanceKm);
 
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/listing-detail', arguments: listing),
+      onTap: () =>
+          Navigator.pushNamed(context, '/listing-detail', arguments: listing),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
@@ -224,17 +245,20 @@ class _ListingsScreenState extends State<ListingsScreen> {
                     children: [
                       Text(
                         listing.productType,
-                        style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600),
+                        style: GoogleFonts.outfit(
+                            fontSize: 15, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${listing.quantity} ${listing.unit} • ${listing.farmerVillage}',
-                        style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: Colors.grey.shade600),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'by ${listing.farmerName}',
-                        style: GoogleFonts.inter(fontSize: 11, color: Colors.grey.shade400),
+                        style: GoogleFonts.inter(
+                            fontSize: 11, color: Colors.grey.shade400),
                       ),
                     ],
                   ),
@@ -243,7 +267,8 @@ class _ListingsScreenState extends State<ListingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: AppTheme.accentAmber.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
@@ -347,11 +372,13 @@ class _ListingsScreenState extends State<ListingsScreen> {
     );
   }
 
-  Widget _gridCard(BuildContext context, ListingModel listing, AppState appState) {
+  Widget _gridCard(
+      BuildContext context, ListingModel listing, AppState appState) {
     final distanceKm = appState.getDistanceToListing(listing);
 
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/listing-detail', arguments: listing),
+      onTap: () =>
+          Navigator.pushNamed(context, '/listing-detail', arguments: listing),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -375,12 +402,14 @@ class _ListingsScreenState extends State<ListingsScreen> {
             const SizedBox(height: 8),
             Text(
               listing.productType,
-              style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600),
+              style:
+                  GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             Text(
               '${listing.quantity} ${listing.unit}',
-              style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
+              style:
+                  GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 6),
             Text(
@@ -414,7 +443,8 @@ class _ListingsScreenState extends State<ListingsScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.near_me, size: 10,
+                  Icon(Icons.near_me,
+                      size: 10,
                       color: distanceKm <= 10
                           ? AppTheme.successGreen
                           : Colors.grey.shade500),
