@@ -615,10 +615,29 @@ class AppState extends ChangeNotifier {
   // â”€â”€â”€ DIRECT TRADE (from Matching Marketplace) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Accept a direct barter trade between current user's listing and another farmer's listing.
+  /// Automatically transfers credits to cover the value gap.
   void acceptDirectTrade(ListingModel myListing, ListingModel theirListing) {
+    // Calculate value gap for credit transfer
+    final valueGap =
+        (myListing.valuationScore - theirListing.valuationScore).abs();
+    final iPayCredits = myListing.valuationScore < theirListing.valuationScore;
+    final tradeId = _uuid.v4();
+
+    // Credit movements for the trade
+    List<CreditMovement> creditMovements = [];
+    if (valueGap > 0) {
+      creditMovements.add(CreditMovement(
+        fromUserId: iPayCredits ? myListing.farmerId : theirListing.farmerId,
+        toUserId: iPayCredits ? theirListing.farmerId : myListing.farmerId,
+        amount: valueGap,
+        description:
+            'Value gap compensation: ${iPayCredits ? myListing.farmerName : theirListing.farmerName} → ${iPayCredits ? theirListing.farmerName : myListing.farmerName}',
+      ));
+    }
+
     // Create trade with both participants
     final trade = TradeModel(
-      loopId: _uuid.v4(),
+      loopId: tradeId,
       participants: [
         TradeParticipant(
           farmerId: myListing.farmerId,
@@ -629,7 +648,7 @@ class AppState extends ChangeNotifier {
           offerQuantity: myListing.quantity,
           unit: myListing.unit,
           valuationAmount: myListing.valuationScore,
-          confirmationStatus: 'confirmed', // I confirmed
+          confirmationStatus: 'confirmed',
         ),
         TradeParticipant(
           farmerId: theirListing.farmerId,
@@ -640,14 +659,106 @@ class AppState extends ChangeNotifier {
           offerQuantity: theirListing.quantity,
           unit: theirListing.unit,
           valuationAmount: theirListing.valuationScore,
-          confirmationStatus: 'pending', // They need to confirm
+          confirmationStatus: 'pending',
         ),
       ],
       status: 'pending',
+      creditMovements: creditMovements,
     );
 
     _trades.insert(0, trade);
     _firestore.saveTrade(trade);
+
+    // Transfer credits if there's a value gap
+    if (valueGap > 0) {
+      final payerId = iPayCredits ? myListing.farmerId : theirListing.farmerId;
+      final receiverId =
+          iPayCredits ? theirListing.farmerId : myListing.farmerId;
+      final payerName =
+          iPayCredits ? myListing.farmerName : theirListing.farmerName;
+      final receiverName =
+          iPayCredits ? theirListing.farmerName : myListing.farmerName;
+
+      // Deduct from payer
+      final payerIdx = _users.indexWhere((u) => u.id == payerId);
+      if (payerIdx != -1) {
+        _users[payerIdx] = _users[payerIdx].copyWith(
+          creditBalance: _users[payerIdx].creditBalance - valueGap,
+        );
+        _firestore.saveUser(_users[payerIdx]);
+      }
+      // Update current user if they are the payer
+      if (_currentUser?.id == payerId) {
+        _currentUser = _currentUser!.copyWith(
+          creditBalance: _currentUser!.creditBalance - valueGap,
+        );
+        _firestore.saveUser(_currentUser!);
+      }
+
+      // Add to receiver
+      final receiverIdx = _users.indexWhere((u) => u.id == receiverId);
+      if (receiverIdx != -1) {
+        _users[receiverIdx] = _users[receiverIdx].copyWith(
+          creditBalance: _users[receiverIdx].creditBalance + valueGap,
+        );
+        _firestore.saveUser(_users[receiverIdx]);
+      }
+      if (_currentUser?.id == receiverId) {
+        _currentUser = _currentUser!.copyWith(
+          creditBalance: _currentUser!.creditBalance + valueGap,
+        );
+        _firestore.saveUser(_currentUser!);
+      }
+
+      // Record transactions
+      _transactions.insert(
+          0,
+          CreditTransactionModel(
+            id: _uuid.v4(),
+            userId: payerId,
+            fromUserId: payerId,
+            toUserId: receiverId,
+            amount: valueGap,
+            type: 'debit',
+            tradeId: tradeId,
+            description:
+                'Trade gap: Paid ₹${valueGap.toStringAsFixed(0)} to $receiverName for ${theirListing.productType}',
+            balanceAfter: payerIdx != -1 ? _users[payerIdx].creditBalance : 0,
+          ));
+      _transactions.insert(
+          0,
+          CreditTransactionModel(
+            id: _uuid.v4(),
+            userId: receiverId,
+            fromUserId: payerId,
+            toUserId: receiverId,
+            amount: valueGap,
+            type: 'credit',
+            tradeId: tradeId,
+            description:
+                'Trade gap: Received ₹${valueGap.toStringAsFixed(0)} from $payerName for ${myListing.productType}',
+            balanceAfter:
+                receiverIdx != -1 ? _users[receiverIdx].creditBalance : 0,
+          ));
+    }
+
+    // Update reputation for both (+2 for trading)
+    if (_currentUser != null) {
+      _currentUser = _currentUser!.copyWith(
+        reputationScore: (_currentUser!.reputationScore + 2).clamp(0, 100),
+        totalTrades: _currentUser!.totalTrades + 1,
+      );
+      _firestore.saveUser(_currentUser!);
+    }
+    final otherIdx = _users.indexWhere((u) => u.id == theirListing.farmerId);
+    if (otherIdx != -1) {
+      _users[otherIdx] = _users[otherIdx].copyWith(
+        reputationScore:
+            (_users[otherIdx].reputationScore + 2).clamp(0.0, 100.0),
+        totalTrades: _users[otherIdx].totalTrades + 1,
+      );
+      _firestore.saveUser(_users[otherIdx]);
+    }
 
     // Update listing statuses
     updateListingStatus(myListing.id, 'in_trade');
@@ -655,7 +766,7 @@ class AppState extends ChangeNotifier {
 
     // Notify
     _notifications.notifyTradeMatched(
-      '${myListing.productType} â†” ${theirListing.productType}',
+      '${myListing.productType} ↔ ${theirListing.productType}',
     );
 
     notifyListeners();

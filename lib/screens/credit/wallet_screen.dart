@@ -16,7 +16,7 @@ class WalletScreen extends StatelessWidget {
     final transactions = appState.myTransactions;
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
+      
       appBar: AppBar(
         title: Text('Credit Wallet', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
         leading: IconButton(

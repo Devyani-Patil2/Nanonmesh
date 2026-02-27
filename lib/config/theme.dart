@@ -226,56 +226,57 @@ class AppTheme {
         error: errorRed,
       ),
       scaffoldBackgroundColor: surfaceDark,
-      textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme)
-          .copyWith(
-            displayLarge: GoogleFonts.outfit(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-            displayMedium: GoogleFonts.outfit(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-            headlineLarge: GoogleFonts.outfit(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-            headlineMedium: GoogleFonts.outfit(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-            titleLarge: GoogleFonts.outfit(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-            titleMedium: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey.shade300,
-            ),
-            bodyLarge: GoogleFonts.inter(
-              fontSize: 16,
-              color: Colors.grey.shade300,
-            ),
-            bodyMedium: GoogleFonts.inter(
-              fontSize: 14,
-              color: Colors.grey.shade400,
-            ),
-            bodySmall: GoogleFonts.inter(
-              fontSize: 12,
-              color: Colors.grey.shade500,
-            ),
-            labelLarge: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
+      cardColor: cardDark,
+      textTheme:
+          GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).copyWith(
+        displayLarge: GoogleFonts.outfit(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+        displayMedium: GoogleFonts.outfit(
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+        headlineLarge: GoogleFonts.outfit(
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+        headlineMedium: GoogleFonts.outfit(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+        titleLarge: GoogleFonts.outfit(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+        titleMedium: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: Colors.grey.shade300,
+        ),
+        bodyLarge: GoogleFonts.inter(
+          fontSize: 16,
+          color: Colors.grey.shade300,
+        ),
+        bodyMedium: GoogleFonts.inter(
+          fontSize: 14,
+          color: Colors.grey.shade400,
+        ),
+        bodySmall: GoogleFonts.inter(
+          fontSize: 12,
+          color: Colors.grey.shade500,
+        ),
+        labelLarge: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+      ),
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
@@ -381,30 +382,30 @@ class AppTheme {
 
   // Glassmorphism Card Decoration
   static BoxDecoration get glassCard => BoxDecoration(
-    color: Colors.white.withValues(alpha: 0.85),
-    borderRadius: BorderRadius.circular(20),
-    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withValues(alpha: 0.05),
-        blurRadius: 20,
-        offset: const Offset(0, 4),
-      ),
-    ],
-  );
+        color: Colors.white.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      );
 
   static BoxDecoration get glassCardDark => BoxDecoration(
-    color: Colors.black.withValues(alpha: 0.4),
-    borderRadius: BorderRadius.circular(20),
-    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withValues(alpha: 0.2),
-        blurRadius: 20,
-        offset: const Offset(0, 4),
-      ),
-    ],
-  );
+        color: Colors.black.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      );
 
   // Status Colors
   static Color statusColor(String status) {

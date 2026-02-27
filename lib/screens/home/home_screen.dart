@@ -16,7 +16,6 @@ class HomeScreen extends StatelessWidget {
     final user = appState.currentUser;
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
       body: CustomScrollView(
         slivers: [
           // Hero App Bar
@@ -211,15 +210,15 @@ class HomeScreen extends StatelessWidget {
                   // Stats Row
                   FadeInUp(
                     delay: const Duration(milliseconds: 100),
-                    child: _buildStatsRow(appState),
+                    child: _buildStatsRow(context, appState),
                   ),
                   const SizedBox(height: 24),
 
                   // Active Trade Loops
                   FadeInUp(
                     delay: const Duration(milliseconds: 200),
-                    child: _buildSectionHeader(
-                        'Active Trade Loops', Icons.swap_horiz_rounded),
+                    child: _buildSectionHeader(context, 'Active Trade Loops',
+                        Icons.swap_horiz_rounded),
                   ),
                   const SizedBox(height: 12),
                   FadeInUp(
@@ -231,8 +230,8 @@ class HomeScreen extends StatelessWidget {
                   // Recent Listings
                   FadeInUp(
                     delay: const Duration(milliseconds: 400),
-                    child: _buildSectionHeader(
-                        'Matching Marketplace', Icons.handshake_rounded),
+                    child: _buildSectionHeader(context, 'Matching Marketplace',
+                        Icons.handshake_rounded),
                   ),
                   const SizedBox(height: 12),
                   FadeInUp(
@@ -335,7 +334,7 @@ class HomeScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -363,7 +362,7 @@ class HomeScreen extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
+                color: Theme.of(context).textTheme.bodyMedium?.color,
                 height: 1.3,
               ),
             ),
@@ -373,11 +372,12 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsRow(AppState appState) {
+  Widget _buildStatsRow(BuildContext context, AppState appState) {
     return Row(
       children: [
         Expanded(
           child: _statCard(
+            context,
             '${appState.activeListings.length}',
             'Active Listings',
             Icons.list_alt,
@@ -387,6 +387,7 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _statCard(
+            context,
             '${appState.myTrades.where((t) => t.status == 'pending').length}',
             'Pending Trades',
             Icons.pending_actions,
@@ -396,6 +397,7 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _statCard(
+            context,
             '${appState.myTrades.where((t) => t.status == 'completed').length}',
             'Completed',
             Icons.check_circle_outline,
@@ -406,11 +408,12 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _statCard(String value, String label, IconData icon, Color color) {
+  Widget _statCard(BuildContext context, String value, String label,
+      IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -445,7 +448,8 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
+  Widget _buildSectionHeader(
+      BuildContext context, String title, IconData icon) {
     return Row(
       children: [
         Icon(icon, color: AppTheme.primaryGreen, size: 22),
@@ -455,7 +459,7 @@ class HomeScreen extends StatelessWidget {
           style: GoogleFonts.outfit(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: const Color(0xFF1A1A1A),
+            color: Theme.of(context).textTheme.headlineMedium?.color,
           ),
         ),
       ],
@@ -470,9 +474,10 @@ class HomeScreen extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
         ),
         child: Column(
           children: [
@@ -515,7 +520,7 @@ class HomeScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: AppTheme.accentAmber.withValues(alpha: 0.3),
@@ -626,7 +631,7 @@ class HomeScreen extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -665,7 +670,7 @@ class HomeScreen extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(

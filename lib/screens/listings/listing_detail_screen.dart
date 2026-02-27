@@ -55,7 +55,7 @@ class ListingDetailScreen extends StatelessWidget {
     final myTradeListing = myMatchingListing ?? myBestListing;
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
+      
       appBar: AppBar(
         title: Text(listing.productType,
             style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
@@ -533,6 +533,92 @@ class ListingDetailScreen extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: Colors.grey.shade600,
+                ),
+              ),
+            const SizedBox(height: 12),
+
+            // Credit transfer info
+            if (valueDiff > 0)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isInMyFavor
+                      ? AppTheme.successGreen.withValues(alpha: 0.08)
+                      : AppTheme.accentAmber.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isInMyFavor
+                        ? AppTheme.successGreen.withValues(alpha: 0.2)
+                        : AppTheme.accentAmber.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isInMyFavor
+                              ? Icons.arrow_downward_rounded
+                              : Icons.arrow_upward_rounded,
+                          size: 16,
+                          color: isInMyFavor
+                              ? AppTheme.successGreen
+                              : AppTheme.accentAmber,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          isInMyFavor
+                              ? 'You receive ₹${valueDiff.toStringAsFixed(0)} credits'
+                              : 'You pay ₹${valueDiff.toStringAsFixed(0)} credits',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isInMyFavor
+                                ? AppTheme.successGreen
+                                : AppTheme.accentAmber,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Current balance: ₹${appState.currentUser?.creditBalance.toStringAsFixed(0) ?? "0"}',
+                      style: GoogleFonts.inter(
+                          fontSize: 11, color: Colors.grey.shade600),
+                    ),
+                    Text(
+                      'After trade: ₹${((appState.currentUser?.creditBalance ?? 0) + (isInMyFavor ? valueDiff : -valueDiff)).toStringAsFixed(0)}',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1A1A1A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (valueDiff == 0)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.successGreen.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle,
+                        size: 16, color: AppTheme.successGreen),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Equal value — no credits needed!',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.successGreen,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             const SizedBox(height: 12),

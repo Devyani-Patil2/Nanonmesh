@@ -108,7 +108,7 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
+      
       appBar: AppBar(
         title: Text(
           'AI Quality Check',

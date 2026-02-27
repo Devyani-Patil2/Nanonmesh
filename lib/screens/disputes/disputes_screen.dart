@@ -14,7 +14,7 @@ class DisputesScreen extends StatelessWidget {
     final disputes = appState.disputes;
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
+      
       appBar: AppBar(
         title: Text('Dispute Center', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
         leading: IconButton(

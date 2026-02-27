@@ -23,6 +23,7 @@ import 'screens/trades/trades_screen.dart';
 import 'screens/trades/trade_detail_screen.dart';
 import 'screens/credit/wallet_screen.dart';
 import 'screens/disputes/disputes_screen.dart';
+import 'screens/profile/credit_history_screen.dart';
 import 'screens/quality/quality_check_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/urgent/urgent_requests_screen.dart';
@@ -103,6 +104,8 @@ class NanonMeshApp extends StatelessWidget {
                   return _slideRoute(const UrgentRequestsScreen());
                 case '/price-discovery':
                   return _slideRoute(const PriceDiscoveryScreen());
+                case '/credit-history':
+                  return _slideRoute(const CreditHistoryScreen());
                 default:
                   return _fadeRoute(const SplashScreen());
               }
@@ -175,7 +178,7 @@ class _MainShellState extends State<MainShell> {
         height: 68,
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         elevation: 12,
         shadowColor: Colors.black.withValues(alpha: 0.15),
         child: Row(
@@ -222,3 +225,9 @@ class _MainShellState extends State<MainShell> {
     );
   }
 }
+
+
+
+
+
+// hello 
