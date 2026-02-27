@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'config/theme.dart';
 import 'providers/app_state.dart';
@@ -23,8 +24,9 @@ import 'screens/quality/quality_check_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/urgent/urgent_requests_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -42,48 +44,54 @@ class NanonMeshApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => AppState(),
-      child: MaterialApp(
-        title: 'NanonMesh',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        initialRoute: '/',
-        onGenerateRoute: (settings) {
-          switch (settings.name) {
-            case '/':
-              return _fadeRoute(const SplashScreen());
-            case '/login':
-              return _slideRoute(const LoginScreen());
-            case '/otp':
-              final phone = settings.arguments as String? ?? '';
-              return _slideRoute(OtpScreen(phoneNumber: phone));
-            case '/profile-setup':
-              final phone = settings.arguments as String? ?? '';
-              return _slideRoute(ProfileSetupScreen(phoneNumber: phone));
-            case '/home':
-              return _fadeRoute(const MainShell());
-            case '/create-listing':
-              return _slideRoute(const CreateListingScreen());
-            case '/listing-detail':
-              final listing = settings.arguments as ListingModel;
-              return _slideRoute(ListingDetailScreen(listing: listing));
-            case '/listings':
-              return _slideRoute(const ListingsScreen());
-            case '/trades':
-              return _slideRoute(const TradesScreen());
-            case '/trade-detail':
-              final trade = settings.arguments as TradeModel;
-              return _slideRoute(TradeDetailScreen(trade: trade));
-            case '/wallet':
-              return _slideRoute(const WalletScreen());
-            case '/disputes':
-              return _slideRoute(const DisputesScreen());
-            case '/quality-check':
-              return _slideRoute(const QualityCheckScreen());
-            case '/urgent-requests':
-              return _slideRoute(const UrgentRequestsScreen());
-            default:
-              return _fadeRoute(const SplashScreen());
-          }
+      child: Consumer<AppState>(
+        builder: (context, appState, _) {
+          return MaterialApp(
+            title: 'NanonMesh',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            initialRoute: '/',
+            onGenerateRoute: (settings) {
+              switch (settings.name) {
+                case '/':
+                  return _fadeRoute(const SplashScreen());
+                case '/login':
+                  return _slideRoute(const LoginScreen());
+                case '/otp':
+                  final phone = settings.arguments as String? ?? '';
+                  return _slideRoute(OtpScreen(phoneNumber: phone));
+                case '/profile-setup':
+                  final phone = settings.arguments as String? ?? '';
+                  return _slideRoute(ProfileSetupScreen(phoneNumber: phone));
+                case '/home':
+                  return _fadeRoute(const MainShell());
+                case '/create-listing':
+                  return _slideRoute(const CreateListingScreen());
+                case '/listing-detail':
+                  final listing = settings.arguments as ListingModel;
+                  return _slideRoute(ListingDetailScreen(listing: listing));
+                case '/listings':
+                  return _slideRoute(const ListingsScreen());
+                case '/trades':
+                  return _slideRoute(const TradesScreen());
+                case '/trade-detail':
+                  final trade = settings.arguments as TradeModel;
+                  return _slideRoute(TradeDetailScreen(trade: trade));
+                case '/wallet':
+                  return _slideRoute(const WalletScreen());
+                case '/disputes':
+                  return _slideRoute(const DisputesScreen());
+                case '/quality-check':
+                  return _slideRoute(const QualityCheckScreen());
+                case '/urgent-requests':
+                  return _slideRoute(const UrgentRequestsScreen());
+                default:
+                  return _fadeRoute(const SplashScreen());
+              }
+            },
+          );
         },
       ),
     );
@@ -103,8 +111,10 @@ class NanonMeshApp extends StatelessWidget {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final tween = Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
-            .chain(CurveTween(curve: Curves.easeInOut));
+        final tween = Tween(
+          begin: const Offset(1.0, 0.0),
+          end: Offset.zero,
+        ).chain(CurveTween(curve: Curves.easeInOut));
         return SlideTransition(position: animation.drive(tween), child: child);
       },
       transitionDuration: const Duration(milliseconds: 300),
@@ -186,7 +196,8 @@ class _MainShellState extends State<MainShell> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade400,
+                color:
+                    isSelected ? AppTheme.primaryGreen : Colors.grey.shade400,
               ),
             ),
           ],
