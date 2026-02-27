@@ -15,41 +15,103 @@ class OtpScreen extends StatefulWidget {
 }
 
 class _OtpScreenState extends State<OtpScreen> {
-  final _otpController = TextEditingController();
-  String _currentOtp = '';
+  final _pinController = TextEditingController();
+  final _confirmPinController = TextEditingController();
+  String _currentPin = '';
+  String _confirmPin = '';
+  bool _isConfirmStep = false;
 
-  void _verifyOtp() async {
-    if (_currentOtp.length != 6) return;
-
+  void _handleSubmit() async {
     final appState = context.read<AppState>();
-    final success = await appState.verifyOtp(_currentOtp);
 
-    if (!mounted) return;
-    if (success) {
-      Navigator.pushReplacementNamed(
-        context,
-        '/profile-setup',
-        arguments: widget.phoneNumber,
-      );
+    if (appState.isNewUser) {
+      // New user: Create PIN flow
+      if (!_isConfirmStep) {
+        // First entry — ask to confirm
+        if (_currentPin.length != 4) return;
+        setState(() {
+          _isConfirmStep = true;
+          _confirmPinController.clear();
+          _confirmPin = '';
+        });
+      } else {
+        // Confirm step — check match
+        if (_confirmPin != _currentPin) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('PINs do not match. Try again.'),
+              backgroundColor: AppTheme.errorRed,
+            ),
+          );
+          setState(() {
+            _isConfirmStep = false;
+            _pinController.clear();
+            _confirmPinController.clear();
+            _currentPin = '';
+            _confirmPin = '';
+          });
+          return;
+        }
+
+        final success = await appState.registerPin(_currentPin);
+        if (!mounted) return;
+        if (success) {
+          Navigator.pushReplacementNamed(
+            context,
+            '/profile-setup',
+            arguments: widget.phoneNumber,
+          );
+        }
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid OTP. Please try again.'),
-          backgroundColor: AppTheme.errorRed,
-        ),
-      );
+      // Existing user: Verify PIN
+      if (_currentPin.length != 4) return;
+      final success = await appState.verifyPin(_currentPin);
+      if (!mounted) return;
+      if (success) {
+        Navigator.pushReplacementNamed(
+          context,
+          '/profile-setup',
+          arguments: widget.phoneNumber,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(appState.authError ?? 'Incorrect PIN'),
+            backgroundColor: AppTheme.errorRed,
+          ),
+        );
+        _pinController.clear();
+        setState(() => _currentPin = '');
+      }
     }
   }
 
   @override
   void dispose() {
-    _otpController.dispose();
+    _pinController.dispose();
+    _confirmPinController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = context.watch<AppState>().isLoading;
+    final appState = context.watch<AppState>();
+    final isLoading = appState.isLoading;
+    final isNew = appState.isNewUser;
+
+    String title;
+    String subtitle;
+    if (isNew && !_isConfirmStep) {
+      title = 'Create PIN';
+      subtitle = 'Create a 4-digit security PIN\nfor ${widget.phoneNumber}';
+    } else if (isNew && _isConfirmStep) {
+      title = 'Confirm PIN';
+      subtitle = 'Re-enter your 4-digit PIN\nto confirm';
+    } else {
+      title = 'Enter PIN';
+      subtitle = 'Enter your 4-digit PIN\nfor ${widget.phoneNumber}';
+    }
 
     return Scaffold(
       body: Container(
@@ -64,7 +126,19 @@ class _OtpScreenState extends State<OtpScreen> {
               children: [
                 const SizedBox(height: 20),
                 IconButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    if (_isConfirmStep) {
+                      setState(() {
+                        _isConfirmStep = false;
+                        _pinController.clear();
+                        _confirmPinController.clear();
+                        _currentPin = '';
+                        _confirmPin = '';
+                      });
+                    } else {
+                      Navigator.pop(context);
+                    }
+                  },
                   icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
                 ),
                 const SizedBox(height: 40),
@@ -76,8 +150,8 @@ class _OtpScreenState extends State<OtpScreen> {
                       color: Colors.white.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.sms_outlined,
+                    child: Icon(
+                      isNew ? Icons.lock_outline : Icons.lock_open,
                       size: 36,
                       color: Colors.white,
                     ),
@@ -87,7 +161,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 FadeInLeft(
                   delay: const Duration(milliseconds: 200),
                   child: Text(
-                    'Verify OTP',
+                    title,
                     style: GoogleFonts.outfit(
                       fontSize: 30,
                       fontWeight: FontWeight.bold,
@@ -99,7 +173,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 FadeInLeft(
                   delay: const Duration(milliseconds: 300),
                   child: Text(
-                    'Enter the 6-digit code sent to\n+91 ${widget.phoneNumber}',
+                    subtitle,
                     style: GoogleFonts.inter(
                       fontSize: 15,
                       color: Colors.white.withValues(alpha: 0.8),
@@ -108,7 +182,7 @@ class _OtpScreenState extends State<OtpScreen> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                // OTP Input
+                // PIN Input
                 FadeInUp(
                   delay: const Duration(milliseconds: 400),
                   child: Container(
@@ -126,34 +200,85 @@ class _OtpScreenState extends State<OtpScreen> {
                     ),
                     child: Column(
                       children: [
+                        if (isNew)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color:
+                                  AppTheme.primaryGreen.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.info_outline,
+                                  size: 18,
+                                  color: AppTheme.primaryGreen,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _isConfirmStep
+                                        ? 'Confirm your PIN to complete signup'
+                                        : 'New number! Create a secure 4-digit PIN',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: AppTheme.primaryGreen,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         PinCodeTextField(
                           appContext: context,
-                          length: 6,
-                          controller: _otpController,
+                          length: 4,
+                          controller: _isConfirmStep
+                              ? _confirmPinController
+                              : _pinController,
+                          obscureText: true,
+                          obscuringCharacter: '●',
                           animationType: AnimationType.scale,
                           pinTheme: PinTheme(
                             shape: PinCodeFieldShape.box,
                             borderRadius: BorderRadius.circular(12),
-                            fieldHeight: 54,
-                            fieldWidth: 44,
+                            fieldHeight: 60,
+                            fieldWidth: 56,
                             activeFillColor: Colors.grey.shade50,
                             inactiveFillColor: Colors.grey.shade100,
-                            selectedFillColor: AppTheme.primaryGreen.withValues(alpha: 0.05),
+                            selectedFillColor:
+                                AppTheme.primaryGreen.withValues(alpha: 0.05),
                             activeColor: AppTheme.primaryGreen,
                             inactiveColor: Colors.grey.shade300,
                             selectedColor: AppTheme.primaryGreen,
                           ),
                           enableActiveFill: true,
                           textStyle: GoogleFonts.inter(
-                            fontSize: 22,
+                            fontSize: 24,
                             fontWeight: FontWeight.w700,
                           ),
+                          keyboardType: TextInputType.number,
                           onChanged: (value) {
-                            setState(() => _currentOtp = value);
+                            setState(() {
+                              if (_isConfirmStep) {
+                                _confirmPin = value;
+                              } else {
+                                _currentPin = value;
+                              }
+                            });
                           },
                           onCompleted: (value) {
-                            _currentOtp = value;
-                            _verifyOtp();
+                            if (_isConfirmStep) {
+                              _confirmPin = value;
+                            } else {
+                              _currentPin = value;
+                            }
+                            _handleSubmit();
                           },
                         ),
                         const SizedBox(height: 20),
@@ -161,9 +286,14 @@ class _OtpScreenState extends State<OtpScreen> {
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
-                            onPressed: (isLoading || _currentOtp.length != 6)
+                            onPressed: isLoading
                                 ? null
-                                : _verifyOtp,
+                                : () {
+                                    final pin = _isConfirmStep
+                                        ? _confirmPin
+                                        : _currentPin;
+                                    if (pin.length == 4) _handleSubmit();
+                                  },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.primaryGreen,
                               foregroundColor: Colors.white,
@@ -182,39 +312,17 @@ class _OtpScreenState extends State<OtpScreen> {
                                     ),
                                   )
                                 : Text(
-                                    'Verify & Continue',
+                                    _isConfirmStep
+                                        ? 'Confirm & Continue'
+                                        : isNew
+                                            ? 'Create PIN'
+                                            : 'Verify & Continue',
                                     style: GoogleFonts.outfit(
                                       fontSize: 17,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Didn\'t receive code? ',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                context.read<AppState>().sendOtp(widget.phoneNumber);
-                              },
-                              child: Text(
-                                'Resend OTP',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.primaryGreen,
-                                ),
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
@@ -225,7 +333,9 @@ class _OtpScreenState extends State<OtpScreen> {
                   delay: const Duration(milliseconds: 600),
                   child: Center(
                     child: Text(
-                      'Tip: Enter any 6 digits for demo',
+                      isNew
+                          ? 'This PIN will be used to log in next time'
+                          : 'Forgot PIN? Contact support',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: Colors.white.withValues(alpha: 0.6),

@@ -54,6 +54,8 @@ class NanonMeshApp extends StatelessWidget {
             title: 'NanonMesh',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
             locale: appState.locale,
             supportedLocales: AppLocalization.supportedLocales,
             localizationsDelegates: const [
@@ -123,8 +125,10 @@ class NanonMeshApp extends StatelessWidget {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final tween = Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
-            .chain(CurveTween(curve: Curves.easeInOut));
+        final tween = Tween(
+          begin: const Offset(1.0, 0.0),
+          end: Offset.zero,
+        ).chain(CurveTween(curve: Curves.easeInOut));
         return SlideTransition(position: animation.drive(tween), child: child);
       },
       transitionDuration: const Duration(milliseconds: 300),
@@ -206,7 +210,8 @@ class _MainShellState extends State<MainShell> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade400,
+                color:
+                    isSelected ? AppTheme.primaryGreen : Colors.grey.shade400,
               ),
             ),
           ],

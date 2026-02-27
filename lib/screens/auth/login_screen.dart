@@ -26,14 +26,28 @@ class _LoginScreenState extends State<LoginScreen> {
   void _sendOtp() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final phone = _phoneController.text.trim();
+    final fullPhone = '+91$phone';
+
     final appState = context.read<AppState>();
-    await appState.sendOtp(_phoneController.text.trim());
+    await appState.checkPhone(fullPhone);
 
     if (!mounted) return;
+
+    if (appState.authError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${appState.authError}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     Navigator.pushNamed(
       context,
       '/otp',
-      arguments: _phoneController.text.trim(),
+      arguments: fullPhone,
     );
   }
 
@@ -139,7 +153,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             decoration: InputDecoration(
                               prefixIcon: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 14),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -170,11 +185,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               fillColor: Colors.grey.shade50,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(color: Colors.grey.shade200),
+                                borderSide:
+                                    BorderSide(color: Colors.grey.shade200),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(color: Colors.grey.shade200),
+                                borderSide:
+                                    BorderSide(color: Colors.grey.shade200),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),

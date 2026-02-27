@@ -16,22 +16,34 @@ class TradeDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final currentUserId = appState.currentUser?.id;
+    final isDark = appState.isDarkMode;
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
+      backgroundColor: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
       appBar: AppBar(
-        title: Text('Trade Loop', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+        title: Text(
+          'Trade Loop',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          if (trade.status == 'confirmed' || trade.status == 'executing')
+            IconButton(
+              icon: const Icon(Icons.report_problem_outlined),
+              tooltip: 'File Dispute',
+              onPressed: () => Navigator.pushNamed(context, '/disputes'),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Loop visualization
+            // Loop visualization header
             FadeInDown(
               child: Container(
                 width: double.infinity,
@@ -52,9 +64,14 @@ class TradeDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: AppTheme.statusColor(trade.status).withValues(alpha: 0.3),
+                        color: AppTheme.statusColor(
+                          trade.status,
+                        ).withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -67,43 +84,51 @@ class TradeDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // Circular loop diagram
+                    // Enhanced loop diagram
                     SizedBox(
-                      height: 200,
+                      height: 220,
+                      width: 220,
                       child: CustomPaint(
-                        size: const Size(200, 200),
-                        painter: _LoopPainter(trade.participants.length),
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.sync_rounded, color: Colors.white, size: 32),
-                              Text(
-                                'Loop Active',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        size: const Size(220, 220),
+                        painter: _EnhancedLoopPainter(trade.participants),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
+
+            // Status FSM Stepper
+            FadeInUp(
+              delay: const Duration(milliseconds: 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Trade Progress',
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : null,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildFullStepper(trade.status, isDark),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
 
             // Participants
             FadeInUp(
-              delay: const Duration(milliseconds: 100),
+              delay: const Duration(milliseconds: 200),
               child: Text(
                 'Participants',
                 style: GoogleFonts.outfit(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : null,
                 ),
               ),
             ),
@@ -115,21 +140,28 @@ class TradeDetailScreen extends StatelessWidget {
               final isCurrentUser = p.farmerId == currentUserId;
 
               return FadeInUp(
-                delay: Duration(milliseconds: 150 + i * 100),
+                delay: Duration(milliseconds: 250 + i * 100),
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: isCurrentUser
-                        ? AppTheme.primaryGreen.withValues(alpha: 0.05)
-                        : Colors.white,
+                        ? AppTheme.primaryGreen.withValues(
+                            alpha: isDark ? 0.15 : 0.05,
+                          )
+                        : (isDark ? AppTheme.cardDark : Colors.white),
                     borderRadius: BorderRadius.circular(16),
                     border: isCurrentUser
-                        ? Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3), width: 2)
+                        ? Border.all(
+                            color: AppTheme.primaryGreen.withValues(alpha: 0.3),
+                            width: 2,
+                          )
                         : null,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
+                        color: Colors.black.withValues(
+                          alpha: isDark ? 0.2 : 0.04,
+                        ),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -141,10 +173,12 @@ class TradeDetailScreen extends StatelessWidget {
                       Row(
                         children: [
                           Container(
-                            width: 40,
-                            height: 40,
+                            width: 44,
+                            height: 44,
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                              color: AppTheme.primaryGreen.withValues(
+                                alpha: 0.1,
+                              ),
                               shape: BoxShape.circle,
                             ),
                             child: Center(
@@ -170,15 +204,21 @@ class TradeDetailScreen extends StatelessWidget {
                                       style: GoogleFonts.outfit(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w600,
+                                        color: isDark ? Colors.white : null,
                                       ),
                                     ),
                                     if (isCurrentUser) ...[
                                       const SizedBox(width: 6),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: AppTheme.primaryGreen,
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                         ),
                                         child: Text(
                                           'YOU',
@@ -196,43 +236,39 @@ class TradeDetailScreen extends StatelessWidget {
                                   '₹${p.valuationAmount.toStringAsFixed(0)} value',
                                   style: GoogleFonts.inter(
                                     fontSize: 12,
-                                    color: Colors.grey.shade600,
+                                    color: isDark
+                                        ? Colors.grey.shade400
+                                        : Colors.grey.shade600,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.statusColor(p.confirmationStatus).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              p.confirmationStatus.toUpperCase(),
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.statusColor(p.confirmationStatus),
-                              ),
-                            ),
-                          ),
+                          // Confirmation status badge
+                          _statusBadge(p.confirmationStatus),
                         ],
                       ),
                       const SizedBox(height: 12),
+                      // Product exchange info
                       Row(
                         children: [
                           _chipInfo(
                             AppConstants.productEmojis[p.offerProduct] ?? '📦',
                             '${p.offerProduct} (${p.offerQuantity.toStringAsFixed(0)} ${p.unit})',
+                            isDark,
                           ),
                           const Padding(
                             padding: EdgeInsets.symmetric(horizontal: 8),
-                            child: Icon(Icons.arrow_forward, size: 16, color: AppTheme.primaryGreen),
+                            child: Icon(
+                              Icons.arrow_forward,
+                              size: 16,
+                              color: AppTheme.primaryGreen,
+                            ),
                           ),
                           _chipInfo(
                             AppConstants.productEmojis[p.wantProduct] ?? '🎯',
                             p.wantProduct,
+                            isDark,
                           ),
                         ],
                       ),
@@ -241,13 +277,83 @@ class TradeDetailScreen extends StatelessWidget {
                 ),
               );
             }),
-
             const SizedBox(height: 20),
+
+            // Credit Movements section
+            if (trade.creditMovements.isNotEmpty) ...[
+              FadeInUp(
+                delay: const Duration(milliseconds: 500),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Credit Settlements',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : null,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...trade.creditMovements.map(
+                      (cm) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.cardDark : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryGreen.withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.swap_horiz_rounded,
+                                color: AppTheme.primaryGreen,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                cm.description,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade600,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '₹${cm.amount.toStringAsFixed(0)}',
+                              style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.primaryGreen,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // Action Buttons
             if (trade.status == 'pending') ...[
               FadeInUp(
-                delay: const Duration(milliseconds: 500),
+                delay: const Duration(milliseconds: 600),
                 child: Column(
                   children: [
                     SizedBox(
@@ -255,7 +361,10 @@ class TradeDetailScreen extends StatelessWidget {
                       height: 56,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          appState.confirmTrade(trade.loopId, currentUserId ?? '');
+                          appState.confirmTrade(
+                            trade.loopId,
+                            currentUserId ?? '',
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Trade confirmed! ✅'),
@@ -267,12 +376,17 @@ class TradeDetailScreen extends StatelessWidget {
                         icon: const Icon(Icons.check_circle_outline),
                         label: Text(
                           'Confirm Trade',
-                          style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w600),
+                          style: GoogleFonts.outfit(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primaryGreen,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                       ),
                     ),
@@ -282,22 +396,145 @@ class TradeDetailScreen extends StatelessWidget {
                       height: 50,
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          appState.declineTrade(trade.loopId, currentUserId ?? '');
+                          appState.declineTrade(
+                            trade.loopId,
+                            currentUserId ?? '',
+                          );
                           Navigator.pop(context);
                         },
                         icon: const Icon(Icons.cancel_outlined),
                         label: Text(
                           'Decline',
-                          style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600),
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.errorRed,
                           side: const BorderSide(color: AppTheme.errorRed),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                       ),
                     ),
                   ],
+                ),
+              ),
+            ],
+
+            if (trade.status == 'confirmed' || trade.status == 'executing') ...[
+              FadeInUp(
+                delay: const Duration(milliseconds: 600),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Evidence upload coming soon! 📸',
+                                style: GoogleFonts.inter(),
+                              ),
+                              backgroundColor: AppTheme.primaryGreen,
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.camera_alt_rounded),
+                        label: Text(
+                          'Upload Delivery Evidence',
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryGreen,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/disputes'),
+                        icon: const Icon(Icons.gavel_rounded),
+                        label: Text(
+                          'File a Dispute',
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.errorRed,
+                          side: const BorderSide(color: AppTheme.errorRed),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            if (trade.status == 'completed') ...[
+              FadeInUp(
+                delay: const Duration(milliseconds: 600),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.successGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppTheme.successGreen.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppTheme.successGreen,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Trade Completed!',
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.successGreen,
+                              ),
+                            ),
+                            Text(
+                              'Credits have been settled for all participants',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: AppTheme.successGreen,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -308,12 +545,150 @@ class TradeDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _chipInfo(String emoji, String label) {
+  Widget _buildFullStepper(String status, bool isDark) {
+    final steps = [
+      ('Pending', 'pending', Icons.hourglass_top_rounded),
+      ('Confirmed', 'confirmed', Icons.check_circle_outline),
+      ('Executing', 'executing', Icons.sync_rounded),
+      ('Completed', 'completed', Icons.verified_rounded),
+    ];
+
+    final currentIdx = steps.indexWhere((s) => s.$2 == status);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: steps.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final step = entry.value;
+          final isActive = idx <= currentIdx && currentIdx >= 0;
+          final isCurrent = idx == currentIdx;
+          final statusColor = isActive
+              ? AppTheme.primaryGreen
+              : (isDark ? Colors.grey.shade700 : Colors.grey.shade300);
+
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? AppTheme.primaryGreen.withValues(alpha: 0.15)
+                          : (isDark
+                                ? Colors.grey.shade800
+                                : Colors.grey.shade100),
+                      shape: BoxShape.circle,
+                      border: isCurrent
+                          ? Border.all(color: AppTheme.primaryGreen, width: 2)
+                          : null,
+                    ),
+                    child: Icon(step.$3, color: statusColor, size: 18),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      step.$1,
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: isCurrent
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: isActive
+                            ? (isDark ? Colors.white : Colors.black)
+                            : (isDark
+                                  ? Colors.grey.shade600
+                                  : Colors.grey.shade400),
+                      ),
+                    ),
+                  ),
+                  if (isActive && !isCurrent)
+                    const Icon(
+                      Icons.check_rounded,
+                      color: AppTheme.primaryGreen,
+                      size: 18,
+                    )
+                  else if (isCurrent)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryGreen,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'CURRENT',
+                        style: GoogleFonts.inter(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              if (idx < steps.length - 1)
+                Container(
+                  margin: const EdgeInsets.only(left: 17),
+                  width: 2,
+                  height: 20,
+                  color: idx < currentIdx
+                      ? AppTheme.primaryGreen
+                      : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _statusBadge(String status) {
+    final color = AppTheme.statusColor(status);
+    final icon = status == 'confirmed'
+        ? Icons.check_circle_rounded
+        : status == 'declined'
+        ? Icons.cancel_rounded
+        : Icons.pending_rounded;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 4),
+        Text(
+          status.toUpperCase(),
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _chipInfo(String emoji, String label, bool isDark) {
     return Flexible(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -324,7 +699,11 @@ class TradeDetailScreen extends StatelessWidget {
             Flexible(
               child: Text(
                 label,
-                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500),
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.grey.shade300 : null,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -335,63 +714,163 @@ class TradeDetailScreen extends StatelessWidget {
   }
 }
 
-class _LoopPainter extends CustomPainter {
-  final int nodeCount;
-  _LoopPainter(this.nodeCount);
+/// Enhanced loop diagram with participant names, product labels, and arrows
+class _EnhancedLoopPainter extends CustomPainter {
+  final List<TradeParticipant> participants;
+  _EnhancedLoopPainter(this.participants);
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 20;
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.3)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
+    final radius = size.width / 2 - 30;
+    final n = participants.length;
 
-    // Draw circle
-    canvas.drawCircle(center, radius, paint);
+    // Calculate node positions
+    final positions = <Offset>[];
+    for (int i = 0; i < n; i++) {
+      final angle = -math.pi / 2 + (2 * math.pi * i / n);
+      positions.add(
+        Offset(
+          center.dx + radius * math.cos(angle),
+          center.dy + radius * math.sin(angle),
+        ),
+      );
+    }
+
+    // Draw edges with arrows
+    for (int i = 0; i < n; i++) {
+      final from = positions[i];
+      final to = positions[(i + 1) % n];
+
+      // Connection line
+      final linePaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.35)
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(from, to, linePaint);
+
+      // Arrow head
+      final dx = to.dx - from.dx;
+      final dy = to.dy - from.dy;
+      final len = math.sqrt(dx * dx + dy * dy);
+      final unitX = dx / len;
+      final unitY = dy / len;
+
+      final arrowTip = Offset(
+        from.dx + unitX * (len - 24),
+        from.dy + unitY * (len - 24),
+      );
+      final arrowPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.7)
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+
+      final path = Path()
+        ..moveTo(arrowTip.dx, arrowTip.dy)
+        ..lineTo(
+          arrowTip.dx - 7 * unitX + 5 * unitY,
+          arrowTip.dy - 7 * unitY - 5 * unitX,
+        )
+        ..moveTo(arrowTip.dx, arrowTip.dy)
+        ..lineTo(
+          arrowTip.dx - 7 * unitX - 5 * unitY,
+          arrowTip.dy - 7 * unitY + 5 * unitX,
+        );
+      canvas.drawPath(path, arrowPaint);
+
+      // Product label on edge
+      final midX = (from.dx + to.dx) / 2;
+      final midY = (from.dy + to.dy) / 2;
+      final labelOffset = Offset(midX + 10 * unitY, midY - 10 * unitX);
+
+      final productEmoji =
+          AppConstants.productEmojis[participants[i].offerProduct] ?? '📦';
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: '$productEmoji ${participants[i].offerProduct}',
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 9,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(
+          labelOffset.dx - textPainter.width / 2,
+          labelOffset.dy - textPainter.height / 2,
+        ),
+      );
+    }
 
     // Draw nodes
-    final nodePaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
+    for (int i = 0; i < n; i++) {
+      final pos = positions[i];
+      final p = participants[i];
+      final isConfirmed = p.confirmationStatus == 'confirmed';
 
-    for (int i = 0; i < nodeCount; i++) {
-      final angle = (2 * math.pi * i / nodeCount) - math.pi / 2;
-      final nodeCenter = Offset(
-        center.dx + radius * math.cos(angle),
-        center.dy + radius * math.sin(angle),
+      // Outer glow
+      final glowPaint = Paint()
+        ..color = (isConfirmed ? Colors.greenAccent : Colors.orangeAccent)
+            .withValues(alpha: 0.25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      canvas.drawCircle(pos, 22, glowPaint);
+
+      // Node circle
+      final nodePaint = Paint()
+        ..color = isConfirmed
+            ? Colors.white
+            : Colors.white.withValues(alpha: 0.7)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(pos, 18, nodePaint);
+
+      // Inner dark circle
+      final innerPaint = Paint()
+        ..color = const Color(0xFF1B5E20)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(pos, 14, innerPaint);
+
+      // Initial letter
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: p.farmerName[0],
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
       );
-      canvas.drawCircle(nodeCenter, 8, nodePaint);
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(pos.dx - textPainter.width / 2, pos.dy - textPainter.height / 2),
+      );
 
-      // Draw arrows between nodes
-      if (i < nodeCount) {
-        final nextAngle = (2 * math.pi * ((i + 1) % nodeCount) / nodeCount) - math.pi / 2;
-        final nextCenter = Offset(
-          center.dx + radius * math.cos(nextAngle),
-          center.dy + radius * math.sin(nextAngle),
-        );
-
-        final arrowPaint = Paint()
-          ..color = Colors.white.withValues(alpha: 0.5)
-          ..strokeWidth = 1.5
-          ..style = PaintingStyle.stroke;
-
-        final midAngle = (angle + nextAngle) / 2;
-        final midPoint = Offset(
-          center.dx + (radius - 15) * math.cos(midAngle),
-          center.dy + (radius - 15) * math.sin(midAngle),
-        );
-
-        final path = Path()
-          ..moveTo(nodeCenter.dx, nodeCenter.dy)
-          ..quadraticBezierTo(midPoint.dx, midPoint.dy, nextCenter.dx, nextCenter.dy);
-
-        canvas.drawPath(path, arrowPaint);
-      }
+      // Name below node
+      final namePainter = TextPainter(
+        text: TextSpan(
+          text: p.farmerName.split(' ')[0],
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      namePainter.layout();
+      namePainter.paint(
+        canvas,
+        Offset(pos.dx - namePainter.width / 2, pos.dy + 22),
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

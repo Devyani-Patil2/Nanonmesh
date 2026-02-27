@@ -132,7 +132,9 @@ class AppTheme {
           foregroundColor: Colors.white,
           elevation: 2,
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           textStyle: GoogleFonts.outfit(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -144,7 +146,9 @@ class AppTheme {
           foregroundColor: primaryGreen,
           side: const BorderSide(color: primaryGreen, width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           textStyle: GoogleFonts.outfit(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -154,7 +158,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 18,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: Colors.grey.shade300),
@@ -171,10 +178,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: errorRed, width: 1.5),
         ),
-        hintStyle: GoogleFonts.inter(
-          fontSize: 14,
-          color: Colors.grey.shade400,
-        ),
+        hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade400),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.white,
@@ -204,10 +208,174 @@ class AppTheme {
         elevation: 4,
         shape: CircleBorder(),
       ),
-      dividerTheme: DividerThemeData(
-        color: Colors.grey.shade200,
-        thickness: 1,
+      dividerTheme: DividerThemeData(color: Colors.grey.shade200, thickness: 1),
+    );
+  }
+
+  // Dark Theme
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primaryGreen,
+        brightness: Brightness.dark,
+        primary: primaryGreenLight,
+        secondary: accentAmber,
+        surface: surfaceDark,
+        error: errorRed,
       ),
+      scaffoldBackgroundColor: surfaceDark,
+      textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme)
+          .copyWith(
+            displayLarge: GoogleFonts.outfit(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            displayMedium: GoogleFonts.outfit(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            headlineLarge: GoogleFonts.outfit(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+            headlineMedium: GoogleFonts.outfit(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+            titleLarge: GoogleFonts.outfit(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+            titleMedium: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade300,
+            ),
+            bodyLarge: GoogleFonts.inter(
+              fontSize: 16,
+              color: Colors.grey.shade300,
+            ),
+            bodyMedium: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.grey.shade400,
+            ),
+            bodySmall: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.grey.shade500,
+            ),
+            labelLarge: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+      appBarTheme: AppBarTheme(
+        centerTitle: false,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        titleTextStyle: GoogleFonts.outfit(
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 2,
+        shadowColor: Colors.black.withValues(alpha: 0.3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        color: cardDark,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryGreen,
+          foregroundColor: Colors.white,
+          elevation: 2,
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.outfit(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: primaryGreenLight,
+          side: const BorderSide(color: primaryGreenLight, width: 1.5),
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.outfit(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF2A2A2A),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 18,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade700),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade700),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: primaryGreenLight, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: errorRed, width: 1.5),
+        ),
+        hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade600),
+      ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: cardDark,
+        selectedItemColor: primaryGreenLight,
+        unselectedItemColor: Colors.grey.shade600,
+        type: BottomNavigationBarType.fixed,
+        elevation: 8,
+        selectedLabelStyle: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: GoogleFonts.inter(fontSize: 11),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: primaryGreen.withValues(alpha: 0.2),
+        labelStyle: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: primaryGreenLight,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        side: BorderSide.none,
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: primaryGreen,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: CircleBorder(),
+      ),
+      dividerTheme: DividerThemeData(color: Colors.grey.shade800, thickness: 1),
     );
   }
 

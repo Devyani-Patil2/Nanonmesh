@@ -27,7 +27,9 @@ class ProfileScreen extends StatelessWidget {
             backgroundColor: AppTheme.primaryGreen,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: const BoxDecoration(gradient: AppTheme.heroGradient),
+                decoration: const BoxDecoration(
+                  gradient: AppTheme.heroGradient,
+                ),
                 child: SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(20),
@@ -41,11 +43,16 @@ class ProfileScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.2),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 3),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              width: 3,
+                            ),
                           ),
                           child: Center(
                             child: Text(
-                              user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'F',
+                              user?.name.isNotEmpty == true
+                                  ? user!.name[0].toUpperCase()
+                                  : 'F',
                               style: GoogleFonts.outfit(
                                 fontSize: 36,
                                 fontWeight: FontWeight.bold,
@@ -72,7 +79,10 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(20),
@@ -80,7 +90,11 @@ class ProfileScreen extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.verified, color: Colors.white, size: 14),
+                              const Icon(
+                                Icons.verified,
+                                color: Colors.white,
+                                size: 14,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 'Phone Verified',
@@ -126,7 +140,11 @@ class ProfileScreen extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.star_rounded, color: AppTheme.accentAmber, size: 22),
+                              const Icon(
+                                Icons.star_rounded,
+                                color: AppTheme.accentAmber,
+                                size: 22,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'Reputation Score',
@@ -160,13 +178,29 @@ class ProfileScreen extends StatelessWidget {
                               Expanded(
                                 child: Column(
                                   children: [
-                                    _reputationBar('Trade Completion', 0.85, AppTheme.successGreen),
+                                    _reputationBar(
+                                      'Trade Completion',
+                                      0.85,
+                                      AppTheme.successGreen,
+                                    ),
                                     const SizedBox(height: 8),
-                                    _reputationBar('Quality Score', 0.78, AppTheme.accentAmber),
+                                    _reputationBar(
+                                      'Quality Score',
+                                      0.78,
+                                      AppTheme.accentAmber,
+                                    ),
                                     const SizedBox(height: 8),
-                                    _reputationBar('Dispute Record', 0.92, AppTheme.skyBlue),
+                                    _reputationBar(
+                                      'Dispute Record',
+                                      0.92,
+                                      AppTheme.skyBlue,
+                                    ),
                                     const SizedBox(height: 8),
-                                    _reputationBar('Community Rating', 0.70, AppTheme.warmBrown),
+                                    _reputationBar(
+                                      'Community Rating',
+                                      0.70,
+                                      AppTheme.warmBrown,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -296,44 +330,109 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       child: Column(
                         children: [
-                          _menuItem(context, Icons.list_alt_rounded, 'My Listings', () {
-                            Navigator.pushNamed(context, '/listings');
-                          }),
+                          _menuItem(
+                            context,
+                            Icons.list_alt_rounded,
+                            'My Listings',
+                            () {
+                              Navigator.pushNamed(context, '/listings');
+                            },
+                          ),
                           _divider(),
-                          _menuItem(context, Icons.swap_calls_rounded, 'Trade History', () {
-                            Navigator.pushNamed(context, '/trades');
-                          }),
+                          _menuItem(
+                            context,
+                            Icons.swap_calls_rounded,
+                            'Trade History',
+                            () {
+                              Navigator.pushNamed(context, '/trades');
+                            },
+                          ),
                           _divider(),
-                          _menuItem(context, Icons.account_balance_wallet_outlined, 'Wallet', () {
-                            Navigator.pushNamed(context, '/wallet');
-                          }),
+                          _menuItem(
+                            context,
+                            Icons.account_balance_wallet_outlined,
+                            'Wallet',
+                            () {
+                              Navigator.pushNamed(context, '/wallet');
+                            },
+                          ),
                           _divider(),
-                          _menuItem(context, Icons.shield_outlined, 'Disputes', () {
-                            Navigator.pushNamed(context, '/disputes');
-                          }),
+                          _menuItem(
+                            context,
+                            Icons.shield_outlined,
+                            'Disputes',
+                            () {
+                              Navigator.pushNamed(context, '/disputes');
+                            },
+                          ),
+                          _menuItem(
+                            context,
+                            Icons.camera_alt_outlined,
+                            'Quality Check',
+                            () {
+                              Navigator.pushNamed(context, '/quality-check');
+                            },
+                          ),
                           _divider(),
-                          _menuItem(context, Icons.camera_alt_outlined, 'Quality Check', () {
-                            Navigator.pushNamed(context, '/quality-check');
-                          }),
+                          _menuItem(
+                            context,
+                            Icons.bar_chart_rounded,
+                            'Mandi Prices',
+                            () {
+                              Navigator.pushNamed(context, '/price-discovery');
+                            },
+                          ),
                           _divider(),
-                          _menuItem(context, Icons.bar_chart_rounded, 'Mandi Prices', () {
-                            Navigator.pushNamed(context, '/price-discovery');
-                          }),
+                          _menuItem(
+                            context,
+                            Icons.upload_file_rounded,
+                            'Export Data for FPO',
+                            () async {
+                              if (user == null) return;
+                              final data = await SupplyChainService.instance
+                                  .generateFPODataPackage(
+                                user: user,
+                                trades: appState.trades,
+                                listings: appState.listings,
+                                transactions: appState.transactions,
+                              );
+                              await SupplyChainService.instance.shareReport(
+                                'Nanonmesh FPO Report - ${user.name}',
+                                data,
+                              );
+                            },
+                          ),
                           _divider(),
-                          _menuItem(context, Icons.upload_file_rounded, 'Export Data for FPO', () async {
-                            if (user == null) return;
-                            final data = await SupplyChainService.instance
-                                .generateFPODataPackage(
-                              user: user,
-                              trades: appState.trades,
-                              listings: appState.listings,
-                              transactions: appState.transactions,
-                            );
-                            await SupplyChainService.instance.shareReport(
-                              'Nanonmesh FPO Report - ${user.name}',
-                              data,
-                            );
-                          }),
+                          // Dark Mode Toggle
+                          ListTile(
+                            leading: Icon(
+                              appState.isDarkMode
+                                  ? Icons.dark_mode_rounded
+                                  : Icons.light_mode_rounded,
+                              color: AppTheme.primaryGreen,
+                              size: 22,
+                            ),
+                            title: Text(
+                              'Dark Mode',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            trailing: Switch(
+                              value: appState.isDarkMode,
+                              onChanged: (_) => appState.toggleTheme(),
+                              activeTrackColor:
+                                  AppTheme.primaryGreen.withValues(alpha: 0.5),
+                              thumbColor:
+                                  WidgetStateProperty.resolveWith((states) {
+                                if (states.contains(WidgetState.selected)) {
+                                  return AppTheme.primaryGreen;
+                                }
+                                return Colors.grey;
+                              }),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -351,14 +450,19 @@ class ProfileScreen extends StatelessWidget {
                           await appState.signOut();
                           if (context.mounted) {
                             Navigator.pushNamedAndRemoveUntil(
-                              context, '/login', (route) => false,
+                              context,
+                              '/login',
+                              (route) => false,
                             );
                           }
                         },
                         icon: const Icon(Icons.logout_rounded, size: 20),
                         label: Text(
                           'Sign Out',
-                          style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600),
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.errorRed,
@@ -412,10 +516,7 @@ class ProfileScreen extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
         ],
       ),
       child: Column(
@@ -440,7 +541,12 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _menuItem(BuildContext context, IconData icon, String label, VoidCallback onTap) {
+  Widget _menuItem(
+    BuildContext context,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
     return ListTile(
       onTap: onTap,
       leading: Icon(icon, color: AppTheme.primaryGreen, size: 22),
@@ -448,7 +554,11 @@ class ProfileScreen extends StatelessWidget {
         label,
         style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
       ),
-      trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
+      trailing: Icon(
+        Icons.arrow_forward_ios,
+        size: 16,
+        color: Colors.grey.shade400,
+      ),
     );
   }
 

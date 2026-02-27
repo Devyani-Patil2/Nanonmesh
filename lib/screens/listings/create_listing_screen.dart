@@ -28,7 +28,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     if (_selectedProduct != null && _quantityController.text.isNotEmpty) {
       final qty = double.tryParse(_quantityController.text) ?? 0;
       final appState = context.read<AppState>();
-      final value = await appState.getValuation(_selectedProduct!, qty);
+      final value = await appState.getValuationAsync(_selectedProduct!, qty);
       if (mounted) {
         setState(() {
           _estimatedValue = value;

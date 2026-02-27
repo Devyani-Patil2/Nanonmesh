@@ -44,6 +44,9 @@ class AppState extends ChangeNotifier {
   // Locale for multi-language
   Locale _locale = const Locale('en', 'IN');
 
+  // Theme
+  bool _isDarkMode = false;
+
   // Getters
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
@@ -52,6 +55,9 @@ class AppState extends ChangeNotifier {
   int get currentTabIndex => _currentTabIndex;
   Locale get locale => _locale;
   final _notifications = NotificationService.instance;
+  bool get isDarkMode => _isDarkMode;
+  String? get authError => _authError;
+  bool get isNewUser => _isNewUser;
 
   List<UserModel> get users => _users;
   List<ListingModel> get listings => _listings;
@@ -61,15 +67,16 @@ class AppState extends ChangeNotifier {
       _listings.where((l) => l.farmerId == _currentUser?.id).toList();
   List<TradeModel> get trades => _trades;
   List<TradeModel> get myTrades => _trades
-      .where((t) =>
-          t.participants.any((p) => p.farmerId == _currentUser?.id))
+      .where((t) => t.participants.any((p) => p.farmerId == _currentUser?.id))
       .toList();
   List<EvidenceModel> get evidence => _evidence;
   List<DisputeModel> get disputes => _disputes;
   List<DisputeModel> get myDisputes => _disputes
-      .where((d) =>
-          d.complainantId == _currentUser?.id ||
-          d.respondentId == _currentUser?.id)
+      .where(
+        (d) =>
+            d.complainantId == _currentUser?.id ||
+            d.respondentId == _currentUser?.id,
+      )
       .toList();
   List<CreditTransactionModel> get transactions => _transactions;
   List<CreditTransactionModel> get myTransactions =>
@@ -88,38 +95,82 @@ class AppState extends ChangeNotifier {
   final _qualityAnalysis = QualityAnalysisService.instance;
   final _imageComparison = ImageComparisonService.instance;
 
-  // ─── AUTHENTICATION ───────────────────────────────────────
+  // ─── PHONE + PIN AUTHENTICATION ────────────────────────────
 
-  Future<void> sendOtp(String phoneNumber) async {
+  String? _authError;
+  bool _isNewUser = false;
+  String _pendingPhone = '';
+
+  /// Check if phone number has a registered PIN
+  Future<void> checkPhone(String phoneNumber) async {
     _isLoading = true;
+    _authError = null;
+    _pendingPhone = phoneNumber;
     notifyListeners();
 
-    // Simulate OTP sending
-    await Future.delayed(const Duration(seconds: 2));
-    _verificationId = _uuid.v4();
+    final prefs = await SharedPreferences.getInstance();
+    final storedPin = prefs.getString('pin_$phoneNumber');
 
+    _isNewUser = (storedPin == null);
+    _verificationId = phoneNumber;
     _isLoading = false;
     notifyListeners();
   }
 
-  Future<bool> verifyOtp(String otp) async {
+  /// Register a new 4-digit PIN for the phone number
+  Future<bool> registerPin(String pin) async {
     _isLoading = true;
+    _authError = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Accept any 6-digit OTP for hackathon demo
-    if (otp.length == 6) {
-      _isAuthenticated = true;
+    if (pin.length != 4) {
+      _authError = 'PIN must be 4 digits';
       _isLoading = false;
       notifyListeners();
-      return true;
+      return false;
     }
 
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('pin_$_pendingPhone', pin);
+
+    _isAuthenticated = true;
     _isLoading = false;
     notifyListeners();
-    return false;
+    return true;
   }
+
+  /// Verify PIN for existing user
+  Future<bool> verifyPin(String pin) async {
+    _isLoading = true;
+    _authError = null;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    final storedPin = prefs.getString('pin_$_pendingPhone');
+
+    if (storedPin == null) {
+      _authError = 'No account found. Please sign up first.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    if (storedPin != pin) {
+      _authError = 'Incorrect PIN. Please try again.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    _isAuthenticated = true;
+    _isLoading = false;
+    notifyListeners();
+    return true;
+  }
+
+  // Compatibility wrappers
+  Future<void> sendOtp(String phoneNumber) async => checkPhone(phoneNumber);
+  Future<bool> verifyOtp(String pin) async => verifyPin(pin);
 
   Future<void> setupProfile({
     required String name,
@@ -174,6 +225,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> checkAuthState() async {
     final prefs = await SharedPreferences.getInstance();
+    _isDarkMode = prefs.getBool('isDarkMode') ?? false;
     final userId = prefs.getString('userId');
     if (userId != null) {
       // Try to load user from SQLite first
@@ -206,7 +258,9 @@ class AppState extends ChangeNotifier {
 
   Future<void> signOut() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    // Only remove session keys, keep PIN data
+    await prefs.remove('userId');
+    await prefs.remove('userName');
     await _db.clearAll();
     _isAuthenticated = false;
     _currentUser = null;
@@ -263,6 +317,14 @@ class AppState extends ChangeNotifier {
     return list;
   }
 
+  // ─── THEME ───────────────────────────────────────────────
+
+  Future<void> toggleTheme() async {
+    _isDarkMode = !_isDarkMode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', _isDarkMode);
+    notifyListeners();
+  }
   // ─── URGENT REQUESTS ──────────────────────────────────────
 
   // ─── DATABASE LOADING ──────────────────────────────────────
@@ -330,7 +392,9 @@ class AppState extends ChangeNotifier {
     if (request.status != 'open') return;
 
     // Find the requester user
-    final requesterIndex = _users.indexWhere((u) => u.id == request.requesterId);
+    final requesterIndex = _users.indexWhere(
+      (u) => u.id == request.requesterId,
+    );
 
     // Update request status
     _urgentRequests[index] = request.copyWith(
@@ -344,7 +408,8 @@ class AppState extends ChangeNotifier {
     // Debit requester
     if (requesterIndex != -1) {
       _users[requesterIndex] = _users[requesterIndex].copyWith(
-        creditBalance: _users[requesterIndex].creditBalance - request.creditCost,
+        creditBalance:
+            _users[requesterIndex].creditBalance - request.creditCost,
       );
     }
     // If the requester is the current user (viewing someone else's perspective)
@@ -373,9 +438,8 @@ class AppState extends ChangeNotifier {
         type: 'debit',
         description:
             'Urgent: Paid for ${request.productNeeded} to ${_currentUser!.name}',
-        balanceAfter: requesterIndex != -1
-            ? _users[requesterIndex].creditBalance
-            : 0,
+        balanceAfter:
+            requesterIndex != -1 ? _users[requesterIndex].creditBalance : 0,
         timestamp: DateTime.now(),
       ),
     );
@@ -416,7 +480,9 @@ class AppState extends ChangeNotifier {
     if (_urgentRequests[index].requesterId != _currentUser?.id) return;
     if (_urgentRequests[index].status != 'open') return;
 
-    _urgentRequests[index] = _urgentRequests[index].copyWith(status: 'cancelled');
+    _urgentRequests[index] = _urgentRequests[index].copyWith(
+      status: 'cancelled',
+    );
     _db.updateUrgentRequest(_urgentRequests[index]);
     notifyListeners();
   }
@@ -525,11 +591,14 @@ class AppState extends ChangeNotifier {
     }).toList();
 
     // Check if a similar trade already exists
-    final existingLoop = _trades.any((t) =>
-        t.status == 'pending' &&
-        t.participants.length == participants.length &&
-        t.participants.every(
-            (p) => participants.any((np) => np.listingId == p.listingId)));
+    final existingLoop = _trades.any(
+      (t) =>
+          t.status == 'pending' &&
+          t.participants.length == participants.length &&
+          t.participants.every(
+            (p) => participants.any((np) => np.listingId == p.listingId),
+          ),
+    );
     if (existingLoop) return;
 
     final trade = TradeModel(
@@ -575,8 +644,9 @@ class AppState extends ChangeNotifier {
     }).toList();
 
     // Check if all confirmed
-    final allConfirmed =
-        updatedParticipants.every((p) => p.confirmationStatus == 'confirmed');
+    final allConfirmed = updatedParticipants.every(
+      (p) => p.confirmationStatus == 'confirmed',
+    );
 
     _trades[tradeIndex] = trade.copyWith(
       participants: updatedParticipants,
@@ -616,29 +686,31 @@ class AppState extends ChangeNotifier {
     // Execute credit movements
     for (int i = 0; i < trade.participants.length; i++) {
       final giver = trade.participants[i];
-      final receiver =
-          trade.participants[(i + 1) % trade.participants.length];
+      final receiver = trade.participants[(i + 1) % trade.participants.length];
 
-      creditMovements.add(CreditMovement(
-        fromUserId: giver.farmerId,
-        toUserId: receiver.farmerId,
-        amount: giver.valuationAmount,
-        description:
-            '${giver.offerProduct} → ${receiver.farmerName}',
-      ));
+      creditMovements.add(
+        CreditMovement(
+          fromUserId: giver.farmerId,
+          toUserId: receiver.farmerId,
+          amount: giver.valuationAmount,
+          description: '${giver.offerProduct} → ${receiver.farmerName}',
+        ),
+      );
 
       // Record transactions
-      _transactions.add(CreditTransactionModel(
-        id: _uuid.v4(),
-        userId: giver.farmerId,
-        fromUserId: giver.farmerId,
-        toUserId: receiver.farmerId,
-        amount: giver.valuationAmount,
-        type: 'debit',
-        tradeId: loopId,
-        description: 'Sent ${giver.offerProduct} to ${receiver.farmerName}',
-        balanceAfter: _currentUser?.creditBalance ?? 0,
-      ));
+      _transactions.add(
+        CreditTransactionModel(
+          id: _uuid.v4(),
+          userId: giver.farmerId,
+          fromUserId: giver.farmerId,
+          toUserId: receiver.farmerId,
+          amount: giver.valuationAmount,
+          type: 'debit',
+          tradeId: loopId,
+          description: 'Sent ${giver.offerProduct} to ${receiver.farmerName}',
+          balanceAfter: _currentUser?.creditBalance ?? 0,
+        ),
+      );
     }
 
     // Mark listings as completed
@@ -657,8 +729,7 @@ class AppState extends ChangeNotifier {
     if (_currentUser != null) {
       _currentUser = _currentUser!.copyWith(
         totalTrades: _currentUser!.totalTrades + 1,
-        reputationScore:
-            min(100, _currentUser!.reputationScore + 2.0),
+        reputationScore: min(100, _currentUser!.reputationScore + 2.0),
       );
       _db.updateUser(_currentUser!);
     }
@@ -695,9 +766,11 @@ class AppState extends ChangeNotifier {
 
   /// Synchronous fallback (used where async isn't practical)
   double _calculateValuation(
-      String productType, double quantity, double qualityScore) {
-    final basePrice =
-        AppConstants.mandiPrices[productType] ?? 50.0;
+    String productType,
+    double quantity,
+    double qualityScore,
+  ) {
+    final basePrice = AppConstants.mandiPrices[productType] ?? 50.0;
     final qualityFactor = qualityScore / 100.0;
     final demandFactor = _calculateRealDemandFactor(productType);
     return basePrice * quantity * qualityFactor * demandFactor;
@@ -728,14 +801,16 @@ class AppState extends ChangeNotifier {
     return ratio.clamp(0.5, 2.0);
   }
 
-  Future<double> getValuation(String productType, double quantity,
+  Future<double> getValuationAsync(String productType, double quantity,
       {double qualityScore = 85.0}) async {
     return _calculateValuationAsync(productType, quantity, qualityScore);
   }
 
-  /// Synchronous version for cases where async isn't possible
-  double getValuationSync(String productType, double quantity,
-      {double qualityScore = 85.0}) {
+  double getValuation(
+    String productType,
+    double quantity, {
+    double qualityScore = 85.0,
+  }) {
     return _calculateValuation(productType, quantity, qualityScore);
   }
 
@@ -999,7 +1074,7 @@ class AppState extends ChangeNotifier {
     if (hasData) return;
     // Create sample farmers
     _users = [
-      ?_currentUser,
+      if (_currentUser != null) _currentUser!,
       UserModel(
         id: 'farmer_001',
         phone: '+91 9876543001',
