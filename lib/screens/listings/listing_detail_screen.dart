@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
-import '../../providers/app_state.dart';
 import '../../models/listing_model.dart';
 
 class ListingDetailScreen extends StatelessWidget {
@@ -13,7 +11,6 @@ class ListingDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
     final basePrice = AppConstants.mandiPrices[listing.productType] ?? 50.0;
     final emoji = AppConstants.productEmojis[listing.productType] ?? '📦';
 

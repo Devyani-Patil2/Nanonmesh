@@ -24,8 +24,8 @@ class AppState extends ChangeNotifier {
   List<UserModel> _users = [];
   List<ListingModel> _listings = [];
   List<TradeModel> _trades = [];
-  List<EvidenceModel> _evidence = [];
-  List<DisputeModel> _disputes = [];
+  final List<EvidenceModel> _evidence = [];
+  final List<DisputeModel> _disputes = [];
   List<CreditTransactionModel> _transactions = [];
 
   // Navigation
@@ -561,7 +561,7 @@ class AppState extends ChangeNotifier {
   void _loadSeedData() {
     // Create sample farmers
     _users = [
-      if (_currentUser != null) _currentUser!,
+      ?_currentUser,
       UserModel(
         id: 'farmer_001',
         phone: '+91 9876543001',

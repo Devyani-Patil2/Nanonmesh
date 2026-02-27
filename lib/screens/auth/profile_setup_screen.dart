@@ -155,7 +155,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           ),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
-                            value: _selectedVillage,
+                            initialValue: _selectedVillage,
                             isDense: false,
                             decoration: InputDecoration(
                               prefixIcon: Icon(

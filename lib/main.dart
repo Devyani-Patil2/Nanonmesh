@@ -88,8 +88,8 @@ class NanonMeshApp extends StatelessWidget {
 
   PageRouteBuilder _fadeRoute(Widget page) {
     return PageRouteBuilder(
-      pageBuilder: (context, animation, __) => page,
-      transitionsBuilder: (context, animation, __, child) {
+      pageBuilder: (context, animation, secondaryAnimation) => page,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
         return FadeTransition(opacity: animation, child: child);
       },
       transitionDuration: const Duration(milliseconds: 300),
@@ -98,8 +98,8 @@ class NanonMeshApp extends StatelessWidget {
 
   PageRouteBuilder _slideRoute(Widget page) {
     return PageRouteBuilder(
-      pageBuilder: (context, animation, __) => page,
-      transitionsBuilder: (context, animation, __, child) {
+      pageBuilder: (context, animation, secondaryAnimation) => page,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
         final tween = Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
             .chain(CurveTween(curve: Curves.easeInOut));
         return SlideTransition(position: animation.drive(tween), child: child);

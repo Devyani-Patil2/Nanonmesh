@@ -112,7 +112,6 @@ class TradeDetailScreen extends StatelessWidget {
             ...trade.participants.asMap().entries.map((entry) {
               final i = entry.key;
               final p = entry.value;
-              final nextP = trade.participants[(i + 1) % trade.participants.length];
               final isCurrentUser = p.farmerId == currentUserId;
 
               return FadeInUp(

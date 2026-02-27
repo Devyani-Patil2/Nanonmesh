@@ -146,7 +146,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedUnit,
+                        initialValue: _selectedUnit,
                         decoration: const InputDecoration(),
                         items: AppConstants.units
                             .map((u) => DropdownMenuItem(value: u, child: Text(u)))
