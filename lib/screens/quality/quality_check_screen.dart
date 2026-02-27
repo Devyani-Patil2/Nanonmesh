@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../config/theme.dart';
 import '../../providers/app_state.dart';
 import '../../models/evidence_model.dart';
+import '../../services/quality_analysis_service.dart';
 
 class QualityCheckScreen extends StatefulWidget {
   const QualityCheckScreen({super.key});
@@ -22,9 +23,21 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
   File? _capturedImage;
   final _picker = ImagePicker();
 
+  // Dynamic labels from AI category detection
+  String _analyzeText = 'Analyzing item...';
+  String _score1Label = '⭐ Quality';
+  String _score2Label = '🔍 Damage';
+  String _score3Label = '🎨 Color';
+  String _score4Label = '📏 Size';
+  String _categoryLabel = '';
+  String _categoryEmoji = '';
+  String _howItWorks = '1. Take a photo of your item\n'
+      '2. AI analyzes quality & condition\n'
+      '3. Get an instant quality score (0–100)\n'
+      '4. Use this score in trade negotiations';
+
   /// Capture a REAL photo using the device camera and analyze it.
   void _captureAndAnalyze() async {
-    // Open real camera
     final XFile? photo = await _picker.pickImage(
       source: ImageSource.camera,
       maxWidth: 800,
@@ -33,30 +46,7 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
     );
 
     if (photo == null || !mounted) return;
-
-    setState(() {
-      _isAnalyzing = true;
-      _capturedImage = File(photo.path);
-    });
-
-    // Read real image bytes
-    final imageBytes = await File(photo.path).readAsBytes();
-
-    if (!mounted) return;
-
-    // Real image analysis (not random!)
-    final appState = context.read<AppState>();
-    final report = await appState.generateQualityScoreFromImage(
-      tradeId: 'quality_${DateTime.now().millisecondsSinceEpoch}',
-      farmerId: appState.currentUser?.id ?? '',
-      imageBytes: imageBytes,
-      photoUrl: photo.path,
-    );
-
-    setState(() {
-      _report = report;
-      _isAnalyzing = false;
-    });
+    await _analyzePhoto(photo);
   }
 
   /// Pick from gallery for testing.
@@ -69,16 +59,37 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
     );
 
     if (photo == null || !mounted) return;
+    await _analyzePhoto(photo);
+  }
 
+  /// Shared analysis logic: read image, detect category, generate report.
+  Future<void> _analyzePhoto(XFile photo) async {
     setState(() {
       _isAnalyzing = true;
       _capturedImage = File(photo.path);
     });
 
+    // Read real image bytes
     final imageBytes = await File(photo.path).readAsBytes();
-
     if (!mounted) return;
 
+    // First, get raw analysis with category detection
+    final rawResult =
+        QualityAnalysisService.instance.analyzeImageBytes(imageBytes);
+
+    // Update dynamic labels from detected category
+    setState(() {
+      _score1Label = rawResult['score1Label'] ?? '⭐ Quality';
+      _score2Label = rawResult['score2Label'] ?? '🔍 Damage';
+      _score3Label = rawResult['score3Label'] ?? '🎨 Color';
+      _score4Label = rawResult['score4Label'] ?? '📏 Size';
+      _categoryLabel = rawResult['categoryLabel'] ?? 'General Item';
+      _categoryEmoji = rawResult['categoryEmoji'] ?? '📦';
+      _analyzeText = rawResult['analyzeText'] ?? 'Analyzing...';
+      _howItWorks = rawResult['howItWorks'] ?? _howItWorks;
+    });
+
+    // Now generate the evidence report via AppState
     final appState = context.read<AppState>();
     final report = await appState.generateQualityScoreFromImage(
       tradeId: 'quality_${DateTime.now().millisecondsSinceEpoch}',
@@ -87,6 +98,7 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
       photoUrl: photo.path,
     );
 
+    if (!mounted) return;
     setState(() {
       _report = report;
       _isAnalyzing = false;
@@ -98,7 +110,10 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceLight,
       appBar: AppBar(
-        title: Text('AI Quality Check', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+        title: Text(
+          'AI Quality Check',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
@@ -145,7 +160,7 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'AI Analyzing Produce...',
+                                '🤖 AI Detecting Item Type...',
                                 style: GoogleFonts.inter(
                                   fontSize: 14,
                                   color: AppTheme.primaryGreen,
@@ -153,11 +168,12 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                                 ),
                               ),
                               Text(
-                                'Checking freshness, damage, color, size',
+                                _analyzeText,
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
-                                  color: Colors.grey.shade500,
+                                  color: Colors.grey.shade400,
                                 ),
+                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
@@ -170,7 +186,8 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                                   width: 64,
                                   height: 64,
                                   decoration: BoxDecoration(
-                                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                                    color: AppTheme.primaryGreen
+                                        .withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -189,7 +206,7 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'Take a photo of your produce',
+                                  'Take a photo of crop, equipment, grain, etc.',
                                   style: GoogleFonts.inter(
                                     fontSize: 13,
                                     color: Colors.grey.shade500,
@@ -201,6 +218,7 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                 ),
               ),
             ),
+
             // Gallery option
             if (!_isAnalyzing)
               FadeInUp(
@@ -209,7 +227,8 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                   child: Center(
                     child: TextButton.icon(
                       onPressed: _pickFromGallery,
-                      icon: const Icon(Icons.photo_library_outlined, size: 18),
+                      icon:
+                          const Icon(Icons.photo_library_outlined, size: 18),
                       label: Text(
                         'Or pick from gallery',
                         style: GoogleFonts.inter(fontSize: 13),
@@ -222,6 +241,61 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
 
             // AI Report
             if (_report != null) ...[
+              // Detected Category Badge
+              FadeInUp(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        _categoryEmoji,
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'AI Detected Category',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                          Text(
+                            _categoryLabel,
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.primaryGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      const Icon(
+                        Icons.auto_awesome,
+                        color: AppTheme.accentAmber,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Overall Score Card
               FadeInUp(
                 child: Container(
                   width: double.infinity,
@@ -234,14 +308,17 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 22),
+                          const Icon(Icons.smart_toy_rounded,
+                              color: Colors.white, size: 22),
                           const SizedBox(width: 8),
-                          Text(
-                            'AI Quality Report',
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                          Expanded(
+                            child: Text(
+                              '$_categoryEmoji AI Quality Report',
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ],
@@ -277,7 +354,10 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                       ),
                       const SizedBox(height: 12),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
@@ -297,7 +377,7 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Score Breakdown
+              // Dynamic Score Breakdown (labels change with category!)
               FadeInUp(
                 delay: const Duration(milliseconds: 100),
                 child: Container(
@@ -316,14 +396,17 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Score Breakdown',
-                        style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700),
+                        'Score Breakdown — $_categoryLabel',
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      _scoreRow('🌿 Freshness', _report!.freshnessScore),
-                      _scoreRow('🔍 Damage Detection', _report!.damageScore),
-                      _scoreRow('🎨 Color Quality', _report!.colorScore),
-                      _scoreRow('📏 Size Consistency', _report!.sizeScore),
+                      _scoreRow(_score1Label, _report!.freshnessScore),
+                      _scoreRow(_score2Label, _report!.damageScore),
+                      _scoreRow(_score3Label, _report!.colorScore),
+                      _scoreRow(_score4Label, _report!.sizeScore),
                     ],
                   ),
                 ),
@@ -341,11 +424,14 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                   ),
                   child: Column(
                     children: [
+                      _metaRow(Icons.category_outlined, 'Detected As',
+                          '$_categoryEmoji $_categoryLabel'),
                       _metaRow(Icons.location_on_outlined, 'Geo-tag',
                           '${_report!.latitude.toStringAsFixed(4)}, ${_report!.longitude.toStringAsFixed(4)}'),
                       _metaRow(Icons.access_time, 'Timestamp',
                           _report!.timestamp.toString().substring(0, 19)),
-                      _metaRow(Icons.tag, 'Report ID', _report!.id.substring(0, 8)),
+                      _metaRow(Icons.tag, 'Report ID',
+                          _report!.id.substring(0, 8)),
                     ],
                   ),
                 ),
@@ -361,10 +447,17 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                       child: OutlinedButton.icon(
                         onPressed: _captureAndAnalyze,
                         icon: const Icon(Icons.refresh, size: 18),
-                        label: Text('Re-analyze', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                        label: Text(
+                          'Re-analyze',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                     ),
@@ -381,10 +474,17 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                           Navigator.pop(context);
                         },
                         icon: const Icon(Icons.save_outlined, size: 18),
-                        label: Text('Save Report', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                        label: Text(
+                          'Save Report',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                     ),
@@ -405,23 +505,37 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
                   ),
                   child: Column(
                     children: [
-                      const Icon(Icons.info_outline, color: AppTheme.skyBlue, size: 28),
+                      const Icon(Icons.auto_awesome,
+                          color: AppTheme.accentAmber, size: 28),
                       const SizedBox(height: 8),
                       Text(
-                        'How it works',
-                        style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600),
+                        'Smart AI Detection',
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
+                      // Category cards
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _categoryChip('🌿', 'Crops', 'Freshness & ripeness'),
+                          _categoryChip('🌾', 'Grains', 'Purity & uniformity'),
+                          _categoryChip('🔧', 'Equipment', 'Condition & rust'),
+                          _categoryChip('🐄', 'Livestock', 'Health & coat'),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       Text(
-                        '1. Take a clear photo of your produce\n'
-                        '2. AI analyzes freshness, damage, color & size\n'
-                        '3. Get an instant quality score (0–100)\n'
-                        '4. Use this score in trade negotiations',
+                        'AI automatically detects what you\'re photographing and generates a report with metrics specific to that item type.',
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           color: Colors.grey.shade600,
-                          height: 1.6,
+                          height: 1.5,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -431,6 +545,47 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
             const SizedBox(height: 40),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _categoryChip(String emoji, String label, String desc) {
+    return Container(
+      width: MediaQuery.of(context).size.width / 2 - 32,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryGreen.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  desc,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -450,10 +605,13 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
       child: Row(
         children: [
           SizedBox(
-            width: 140,
+            width: 150,
             child: Text(
               label,
-              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           Expanded(
@@ -492,12 +650,21 @@ class _QualityCheckScreenState extends State<QualityCheckScreen> {
         children: [
           Icon(icon, size: 16, color: Colors.grey.shade500),
           const SizedBox(width: 8),
-          Text(label, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.grey.shade500,
+            ),
+          ),
           const Spacer(),
           Flexible(
             child: Text(
               value,
-              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),

@@ -20,36 +20,52 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isDetectingLocation = false;
   String _locationStatus = '';
+  bool _locationError = false;
+  bool _permissionDenied = false;
+
+  double? _detectedLat;
+  double? _detectedLng;
 
   @override
   void initState() {
     super.initState();
-    // Auto-detect village from GPS
+    // Auto-detect village from GPS on screen load
     _detectLocation();
   }
 
-  /// Use real GPS to auto-fill village name.
+  /// Use real GPS to auto-fill village name with proper error feedback.
   Future<void> _detectLocation() async {
     setState(() {
       _isDetectingLocation = true;
-      _locationStatus = 'Detecting your location...';
+      _locationStatus = '📡 Detecting your location...';
+      _locationError = false;
+      _permissionDenied = false;
     });
 
-    final position = await LocationService.instance.getCurrentPosition();
-    if (position != null && mounted) {
-      final village = await LocationService.instance
-          .getVillageFromCoordinates(position.latitude, position.longitude);
-      if (mounted) {
-        setState(() {
-          _villageController.text = village;
-          _isDetectingLocation = false;
-          _locationStatus = 'Location detected ✓';
-        });
-      }
-    } else if (mounted) {
+    final result = await LocationService.instance.detectLocation();
+
+    if (!mounted) return;
+
+    if (result.success) {
+      final lat = result.position!.latitude;
+      final lng = result.position!.longitude;
+      setState(() {
+        _villageController.text = result.villageName ?? 'Unknown';
+        _detectedLat = lat;
+        _detectedLng = lng;
+        _isDetectingLocation = false;
+        _locationError = false;
+        _locationStatus =
+            '📍 Location detected: ${result.villageName}\n'
+            '🌐 Coordinates: ${_detectedLat!.toStringAsFixed(4)}, '
+            '${_detectedLng!.toStringAsFixed(4)}';
+      });
+    } else {
       setState(() {
         _isDetectingLocation = false;
-        _locationStatus = 'Could not detect location. Enter manually.';
+        _locationError = true;
+        _permissionDenied = result.permissionDenied;
+        _locationStatus = '⚠️ ${result.error}';
       });
     }
   }
@@ -180,6 +196,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             },
                           ),
                           const SizedBox(height: 24),
+
                           // Village Input (real GPS + manual entry)
                           Row(
                             children: [
@@ -193,35 +210,60 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                               ),
                               const Spacer(),
                               if (_isDetectingLocation)
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppTheme.primaryGreen,
-                                  ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppTheme.primaryGreen,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Detecting...',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        color: AppTheme.primaryGreen,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 )
                               else
                                 GestureDetector(
                                   onTap: _detectLocation,
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.my_location,
-                                        size: 16,
-                                        color: AppTheme.primaryGreen,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Auto-detect',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryGreen
+                                          .withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.my_location,
+                                          size: 14,
                                           color: AppTheme.primaryGreen,
-                                          fontWeight: FontWeight.w600,
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Auto-detect',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            color: AppTheme.primaryGreen,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                             ],
@@ -240,17 +282,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                                 color: Colors.grey.shade500,
                               ),
                               hintText: 'Enter your village name',
-                              suffixIcon: _isDetectingLocation
-                                  ? Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.grey.shade400,
-                                        ),
-                                      ),
+                              suffixIcon: _detectedLat != null
+                                  ? const Icon(
+                                      Icons.check_circle,
+                                      color: AppTheme.successGreen,
+                                      size: 20,
                                     )
                                   : null,
                             ),
@@ -261,27 +297,77 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                               return null;
                             },
                           ),
+
+                          // Location status message
                           if (_locationStatus.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              _locationStatus,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: _locationStatus.contains('✓')
-                                    ? AppTheme.successGreen
-                                    : Colors.grey.shade500,
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: _locationError
+                                    ? Colors.red.shade50
+                                    : AppTheme.successGreen
+                                        .withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _locationError
+                                      ? Colors.red.shade200
+                                      : AppTheme.successGreen
+                                          .withValues(alpha: 0.3),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _locationStatus,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      height: 1.4,
+                                      color: _locationError
+                                          ? Colors.red.shade700
+                                          : AppTheme.successGreen,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  // Show "Open Settings" button for permission errors
+                                  if (_permissionDenied) ...[
+                                    const SizedBox(height: 6),
+                                    GestureDetector(
+                                      onTap: () async {
+                                        await LocationService.instance
+                                            .openAppSettings();
+                                      },
+                                      child: Text(
+                                        '→ Open Settings',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppTheme.primaryGreen,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ],
+
                           const SizedBox(height: 24),
+
                           // Phone display
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryGreen.withValues(alpha: 0.05),
+                              color: AppTheme.primaryGreen
+                                  .withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: AppTheme.primaryGreen.withValues(alpha: 0.2),
+                                color: AppTheme.primaryGreen
+                                    .withValues(alpha: 0.2),
                               ),
                             ),
                             child: Row(
@@ -322,6 +408,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             ),
                           ),
                           const SizedBox(height: 28),
+
                           // Continue Button
                           SizedBox(
                             width: double.infinity,
