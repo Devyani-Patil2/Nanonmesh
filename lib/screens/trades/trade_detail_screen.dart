@@ -426,7 +426,7 @@ class TradeDetailScreen extends StatelessWidget {
               ),
             ],
 
-            if (trade.status == 'confirmed' || trade.status == 'executing') ...[
+            if (trade.status == 'confirmed' || trade.status == 'executing' || trade.status == 'disputed') ...[
               FadeInUp(
                 delay: const Duration(milliseconds: 600),
                 child: Builder(
@@ -447,6 +447,7 @@ class TradeDetailScreen extends StatelessWidget {
                     final mySendingProduct = myParticipant.offerProduct;
                     final myReceivingProduct = otherParticipant.offerProduct;
 
+                    // My evidence
                     final sendEvidence = appState.getMyEvidence(
                       trade.loopId, currentUserId ?? '', 'sending',
                     );
@@ -454,105 +455,248 @@ class TradeDetailScreen extends StatelessWidget {
                       trade.loopId, currentUserId ?? '', 'receiving',
                     );
 
+                    // All evidence
                     final allEvidence = appState.getEvidenceForTrade(trade.loopId);
-                    final totalUploaded = allEvidence.length;
-                    final totalNeeded = trade.participants.length * 2;
+                    final allSending = allEvidence.where((e) => e.role == 'sending').toList();
+                    final bothSentUploaded = allSending.length >= trade.participants.length;
+                    final allDone = allEvidence.length >= trade.participants.length * 2;
 
                     return Column(
                       children: [
-                        // ── SENDING EVIDENCE ─────────────────
-                        _evidenceSection(
-                          ctx: ctx,
-                          title: '📤 Sending: $mySendingProduct',
-                          subtitle: 'Photo of what YOU are sending',
-                          evidence: sendEvidence,
-                          buttonColor: AppTheme.skyBlue,
-                          onUpload: () => _uploadPhoto(
-                            ctx, trade.loopId, currentUserId ?? '',
-                            'sending', mySendingProduct, appState,
-                          ),
-                        ),
-
-                        const SizedBox(height: 14),
-
-                        // ── RECEIVING EVIDENCE ───────────────
-                        _evidenceSection(
-                          ctx: ctx,
-                          title: '📥 Receiving: $myReceivingProduct',
-                          subtitle: 'Photo of what YOU received',
-                          evidence: recvEvidence,
-                          buttonColor: AppTheme.accentAmber,
-                          onUpload: () => _uploadPhoto(
-                            ctx, trade.loopId, currentUserId ?? '',
-                            'receiving', myReceivingProduct, appState,
-                          ),
-                        ),
-
-                        // Progress status
-                        const SizedBox(height: 14),
+                        // ══════ PHASE 1: SENDING PHOTO ══════
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: totalUploaded >= totalNeeded
-                                ? AppTheme.successGreen.withValues(alpha: 0.08)
-                                : AppTheme.accentAmber.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppTheme.skyBlue.withValues(alpha: 0.3)),
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                totalUploaded >= totalNeeded
-                                    ? Icons.check_circle_rounded
-                                    : Icons.hourglass_top_rounded,
-                                color: totalUploaded >= totalNeeded
-                                    ? AppTheme.successGreen
-                                    : AppTheme.accentAmber,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  totalUploaded >= totalNeeded
-                                      ? 'All photos uploaded! AI comparison complete.'
-                                      : 'Evidence: $totalUploaded / $totalNeeded photos uploaded',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: totalUploaded >= totalNeeded
-                                        ? AppTheme.successGreen
-                                        : AppTheme.accentAmber,
-                                  ),
+                              Row(children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.skyBlue.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(8)),
+                                  child: Text('STEP 1', style: GoogleFonts.outfit(
+                                    fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.skyBlue)),
+                                ),
+                                const SizedBox(width: 8),
+                                Text('Upload Sending Photo', style: GoogleFonts.outfit(
+                                  fontSize: 14, fontWeight: FontWeight.w700)),
+                              ]),
+                              const SizedBox(height: 6),
+                              Text('Take a photo of $mySendingProduct before you hand it over',
+                                style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600)),
+                              const SizedBox(height: 10),
+                              _evidenceSection(
+                                ctx: ctx,
+                                title: '📤 Sending: $mySendingProduct',
+                                subtitle: 'Your product before delivery',
+                                evidence: sendEvidence,
+                                buttonColor: AppTheme.skyBlue,
+                                onUpload: () => _uploadPhoto(
+                                  ctx, trade.loopId, currentUserId ?? '',
+                                  'sending', mySendingProduct, appState,
                                 ),
                               ),
+                              if (!bothSentUploaded && sendEvidence != null) ...[
+                                const SizedBox(height: 8),
+                                Row(children: [
+                                  const Icon(Icons.hourglass_top_rounded,
+                                    color: AppTheme.accentAmber, size: 16),
+                                  const SizedBox(width: 6),
+                                  Text('Waiting for other farmer to upload their sending photo...',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11, color: AppTheme.accentAmber,
+                                      fontWeight: FontWeight.w500)),
+                                ]),
+                              ],
+                              if (bothSentUploaded) ...[
+                                const SizedBox(height: 8),
+                                Row(children: [
+                                  const Icon(Icons.check_circle_rounded,
+                                    color: AppTheme.successGreen, size: 16),
+                                  const SizedBox(width: 6),
+                                  Text('Both sending photos uploaded ✅',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11, color: AppTheme.successGreen,
+                                      fontWeight: FontWeight.w500)),
+                                ]),
+                              ],
                             ],
                           ),
                         ),
 
-                        const SizedBox(height: 12),
-                        SizedBox(
+                        const SizedBox(height: 14),
+
+                        // ══════ PHASE 2: RECEIVING PHOTO (unlocked after both send) ══════
+                        Container(
                           width: double.infinity,
-                          height: 50,
-                          child: OutlinedButton.icon(
-                            onPressed: () =>
-                                Navigator.pushNamed(context, '/disputes'),
-                            icon: const Icon(Icons.gavel_rounded),
-                            label: Text(
-                              'File a Dispute',
-                              style: GoogleFonts.outfit(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.errorRed,
-                              side: const BorderSide(color: AppTheme.errorRed),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: bothSentUploaded ? Colors.white : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: bothSentUploaded
+                                  ? AppTheme.accentAmber.withValues(alpha: 0.3)
+                                  : Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: bothSentUploaded
+                                        ? AppTheme.accentAmber.withValues(alpha: 0.15)
+                                        : Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(8)),
+                                  child: Text('STEP 2', style: GoogleFonts.outfit(
+                                    fontSize: 11, fontWeight: FontWeight.w700,
+                                    color: bothSentUploaded ? AppTheme.accentAmber : Colors.grey)),
+                                ),
+                                const SizedBox(width: 8),
+                                Text('Upload Receiving Photo', style: GoogleFonts.outfit(
+                                  fontSize: 14, fontWeight: FontWeight.w700,
+                                  color: bothSentUploaded ? null : Colors.grey)),
+                              ]),
+                              const SizedBox(height: 6),
+                              if (!bothSentUploaded)
+                                Text('🔒 Unlocks after both farmers upload their sending photos',
+                                  style: GoogleFonts.inter(fontSize: 12, color: Colors.grey))
+                              else ...[
+                                Text('Take a photo of $myReceivingProduct that you received',
+                                  style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600)),
+                                const SizedBox(height: 10),
+                                _evidenceSection(
+                                  ctx: ctx,
+                                  title: '📥 Receiving: $myReceivingProduct',
+                                  subtitle: 'Product you received from other farmer',
+                                  evidence: recvEvidence,
+                                  buttonColor: AppTheme.accentAmber,
+                                  onUpload: () => _uploadPhoto(
+                                    ctx, trade.loopId, currentUserId ?? '',
+                                    'receiving', myReceivingProduct, appState,
+                                  ),
+                                ),
+                                if (!allDone && recvEvidence != null) ...[
+                                  const SizedBox(height: 8),
+                                  Row(children: [
+                                    const Icon(Icons.hourglass_top_rounded,
+                                      color: AppTheme.accentAmber, size: 16),
+                                    const SizedBox(width: 6),
+                                    Text('Waiting for other farmer to upload receiving photo...',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11, color: AppTheme.accentAmber,
+                                        fontWeight: FontWeight.w500)),
+                                  ]),
+                                ],
+                              ],
+                            ],
                           ),
                         ),
+
+                        // ══════ RESULT: Compare & Complete or Dispute ══════
+                        if (allDone) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: trade.status == 'disputed'
+                                  ? AppTheme.errorRed.withValues(alpha: 0.08)
+                                  : AppTheme.successGreen.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: trade.status == 'disputed'
+                                    ? AppTheme.errorRed.withValues(alpha: 0.3)
+                                    : AppTheme.successGreen.withValues(alpha: 0.3)),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(children: [
+                                  Icon(
+                                    trade.status == 'disputed'
+                                        ? Icons.warning_rounded
+                                        : Icons.verified_rounded,
+                                    color: trade.status == 'disputed'
+                                        ? AppTheme.errorRed
+                                        : AppTheme.successGreen,
+                                    size: 24),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      trade.status == 'disputed'
+                                          ? 'Mismatch detected! Dispute filed automatically.'
+                                          : 'AI verification passed! Photos match.',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 14, fontWeight: FontWeight.w700,
+                                        color: trade.status == 'disputed'
+                                            ? AppTheme.errorRed
+                                            : AppTheme.successGreen),
+                                    ),
+                                  ),
+                                ]),
+                                if (trade.status != 'disputed' && trade.status != 'completed') ...[
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        appState.completeTrade(trade.loopId);
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Trade completed! 🎉',
+                                                style: GoogleFonts.inter()),
+                                              backgroundColor: AppTheme.successGreen),
+                                          );
+                                          Navigator.pop(context);
+                                        }
+                                      },
+                                      icon: const Icon(Icons.check_circle_rounded),
+                                      label: Text('Complete Trade',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 16, fontWeight: FontWeight.w700)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.successGreen,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(14))),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        if (trade.status == 'disputed') ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: OutlinedButton.icon(
+                              onPressed: () =>
+                                  Navigator.pushNamed(context, '/disputes'),
+                              icon: const Icon(Icons.gavel_rounded),
+                              label: Text('View Disputes',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 15, fontWeight: FontWeight.w600)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.errorRed,
+                                side: const BorderSide(color: AppTheme.errorRed),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14))),
+                            ),
+                          ),
+                        ],
                       ],
                     );
                   },

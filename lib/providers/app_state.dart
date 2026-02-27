@@ -963,6 +963,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Public method: complete trade after AI verification passes.
+  /// Called when user taps 'Complete Trade' button.
+  void completeTrade(String loopId) {
+    _executeTrade(loopId);
+  }
+
   void _executeTrade(String loopId) {
     final tradeIndex = _trades.indexWhere((t) => t.loopId == loopId);
     if (tradeIndex == -1) return;
@@ -974,28 +980,78 @@ class AppState extends ChangeNotifier {
     for (int i = 0; i < trade.participants.length; i++) {
       final giver = trade.participants[i];
       final receiver = trade.participants[(i + 1) % trade.participants.length];
+      final amount = giver.valuationAmount;
 
       creditMovements.add(
         CreditMovement(
           fromUserId: giver.farmerId,
           toUserId: receiver.farmerId,
-          amount: giver.valuationAmount,
-          description: '${giver.offerProduct} â†’ ${receiver.farmerName}',
+          amount: amount,
+          description: '${giver.offerProduct} → ${receiver.farmerName}',
         ),
       );
 
-      // Record transactions
-      _transactions.add(
+      // Deduct from giver's internal balance
+      final giverIdx = _users.indexWhere((u) => u.id == giver.farmerId);
+      if (giverIdx != -1) {
+        _users[giverIdx] = _users[giverIdx].copyWith(
+          creditBalance: _users[giverIdx].creditBalance - amount,
+        );
+        _firestore.saveUser(_users[giverIdx]);
+      }
+      if (_currentUser?.id == giver.farmerId) {
+        _currentUser = _currentUser!.copyWith(
+          creditBalance: _currentUser!.creditBalance - amount,
+        );
+        _firestore.saveUser(_currentUser!);
+      }
+
+      // Add to receiver's internal balance
+      final receiverIdx = _users.indexWhere((u) => u.id == receiver.farmerId);
+      if (receiverIdx != -1) {
+        _users[receiverIdx] = _users[receiverIdx].copyWith(
+          creditBalance: _users[receiverIdx].creditBalance + amount,
+        );
+        _firestore.saveUser(_users[receiverIdx]);
+      }
+      if (_currentUser?.id == receiver.farmerId) {
+        _currentUser = _currentUser!.copyWith(
+          creditBalance: _currentUser!.creditBalance + amount,
+        );
+        _firestore.saveUser(_currentUser!);
+      }
+
+      // Record DEBIT transaction for giver
+      _transactions.insert(
+        0,
         CreditTransactionModel(
           id: _uuid.v4(),
           userId: giver.farmerId,
           fromUserId: giver.farmerId,
           toUserId: receiver.farmerId,
-          amount: giver.valuationAmount,
+          amount: amount,
           type: 'debit',
           tradeId: loopId,
           description: 'Sent ${giver.offerProduct} to ${receiver.farmerName}',
-          balanceAfter: _currentUser?.creditBalance ?? 0,
+          balanceAfter: giverIdx != -1 ? _users[giverIdx].creditBalance : 0,
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      // Record CREDIT transaction for receiver
+      _transactions.insert(
+        0,
+        CreditTransactionModel(
+          id: _uuid.v4(),
+          userId: receiver.farmerId,
+          fromUserId: giver.farmerId,
+          toUserId: receiver.farmerId,
+          amount: amount,
+          type: 'credit',
+          tradeId: loopId,
+          description: 'Received ${giver.offerProduct} from ${giver.farmerName}',
+          balanceAfter: receiverIdx != -1 ? _users[receiverIdx].creditBalance : 0,
+          timestamp: DateTime.now(),
         ),
       );
     }
@@ -1264,8 +1320,9 @@ class AppState extends ChangeNotifier {
     }
 
     if (!anyMismatch) {
-      // All products match → trade is legit, complete it
-      _executeTrade(tradeId);
+      // All products match → trade stays at 'executing'
+      // User will manually click 'Complete Trade' button
+      notifyListeners();
     } else {
       // Mismatch found → auto-create dispute
       final respondent = trade.participants.first.farmerId;
