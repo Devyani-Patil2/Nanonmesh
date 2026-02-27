@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -46,6 +47,11 @@ class AppState extends ChangeNotifier {
 
   // Theme
   bool _isDarkMode = false;
+
+  // Real-time Firestore listeners
+  StreamSubscription? _listingsSubscription;
+  StreamSubscription? _tradesSubscription;
+  StreamSubscription? _urgentRequestsSubscription;
 
   // Getters
   bool get isAuthenticated => _isAuthenticated;
@@ -243,6 +249,8 @@ class AppState extends ChangeNotifier {
 
     // Load seed data after setup (checks db first)
     await _loadSeedData();
+    // Start real-time listeners for cross-device sync
+    _startListeningToFirestore();
     notifyListeners();
   }
 
@@ -269,8 +277,11 @@ class AppState extends ChangeNotifier {
       }
       _isAuthenticated = true;
 
-      // Load data from Firestore (cross-device) + SQLite fallback
+      // Load data from Firestore (one-time initial load)
       await _loadDataFromFirestore();
+
+      // Start real-time listeners for cross-device sync
+      _startListeningToFirestore();
 
       // Seed if no listings exist yet
       if (_listings.isEmpty) {
@@ -365,6 +376,43 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       debugPrint('Firestore load failed: $e');
     }
+  }
+
+  /// Start listening to Firestore streams for real-time updates.
+  /// When another user creates a listing, it appears automatically.
+  void _startListeningToFirestore() {
+    // Cancel any existing subscriptions
+    _listingsSubscription?.cancel();
+    _tradesSubscription?.cancel();
+    _urgentRequestsSubscription?.cancel();
+
+    // Listen to listings changes (cross-device)
+    _listingsSubscription = _firestore.listingsStream().listen((listings) {
+      _listings = listings;
+      notifyListeners();
+    });
+
+    // Listen to trades changes
+    _tradesSubscription = _firestore.tradesStream().listen((trades) {
+      _trades = trades;
+      notifyListeners();
+    });
+
+    // Listen to urgent requests changes
+    _urgentRequestsSubscription =
+        _firestore.urgentRequestsStream().listen((requests) {
+      _urgentRequests.clear();
+      _urgentRequests.addAll(requests);
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _listingsSubscription?.cancel();
+    _tradesSubscription?.cancel();
+    _urgentRequestsSubscription?.cancel();
+    super.dispose();
   }
 
   // ─── URGENT REQUEST ACTIONS ───────────────────────────────
