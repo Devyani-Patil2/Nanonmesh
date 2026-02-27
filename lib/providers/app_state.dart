@@ -11,7 +11,7 @@ import '../models/dispute_model.dart';
 import '../models/credit_transaction_model.dart';
 import '../models/urgent_request_model.dart';
 import '../config/constants.dart';
-import '../services/database_helper.dart';
+import '../services/firestore_service.dart';
 import '../services/location_service.dart';
 import '../services/mandi_price_service.dart';
 import '../services/quality_analysis_service.dart';
@@ -89,7 +89,7 @@ class AppState extends ChangeNotifier {
 
   final _uuid = const Uuid();
   final _random = Random();
-  final _db = DatabaseHelper.instance;
+  final _firestore = FirestoreService.instance;
   final _location = LocationService.instance;
   final _mandiPrices = MandiPriceService.instance;
   final _qualityAnalysis = QualityAnalysisService.instance;
@@ -211,8 +211,8 @@ class AppState extends ChangeNotifier {
     await prefs.setString('userId', userId);
     await prefs.setString('userName', name);
 
-    // Persist user to SQLite
-    await _db.insertUser(_currentUser!);
+    // Sync to Firestore for cross-device visibility
+    await _firestore.saveUser(_currentUser!);
 
     // Seed mandi prices into SQLite and try to fetch latest from API
     await _mandiPrices.seedDefaultPrices();
@@ -228,10 +228,11 @@ class AppState extends ChangeNotifier {
     _isDarkMode = prefs.getBool('isDarkMode') ?? false;
     final userId = prefs.getString('userId');
     if (userId != null) {
-      // Try to load user from SQLite first
-      final dbUser = await _db.getUser(userId);
-      if (dbUser != null) {
-        _currentUser = dbUser;
+      // Try to load user from Firestore
+      final firestoreUsers = await _firestore.getUsers();
+      final matchedUser = firestoreUsers.where((u) => u.id == userId).toList();
+      if (matchedUser.isNotEmpty) {
+        _currentUser = matchedUser.first;
       } else {
         final userName = prefs.getString('userName') ?? 'Farmer';
         _currentUser = UserModel(
@@ -241,15 +242,15 @@ class AppState extends ChangeNotifier {
           village: 'Rampur',
           creditBalance: AppConstants.initialCreditBalance,
         );
-        await _db.insertUser(_currentUser!);
+        await _firestore.saveUser(_currentUser!);
       }
       _isAuthenticated = true;
 
-      // Load all data from SQLite
-      await _loadDataFromDB();
+      // Load data from Firestore (cross-device) + SQLite fallback
+      await _loadDataFromFirestore();
 
-      // Seed if db is empty (first launch after auth)
-      if (_users.length <= 1) {
+      // Seed if no listings exist yet
+      if (_listings.isEmpty) {
         await _loadSeedData();
       }
       notifyListeners();
@@ -261,7 +262,6 @@ class AppState extends ChangeNotifier {
     // Only remove session keys, keep PIN data
     await prefs.remove('userId');
     await prefs.remove('userName');
-    await _db.clearAll();
     _isAuthenticated = false;
     _currentUser = null;
     _users.clear();
@@ -293,11 +293,12 @@ class AppState extends ChangeNotifier {
   double getDistanceToListing(ListingModel listing) {
     if (_currentUser == null) return 0;
     return Geolocator.distanceBetween(
-      _currentUser!.latitude,
-      _currentUser!.longitude,
-      listing.latitude,
-      listing.longitude,
-    ) / 1000; // meters → km
+          _currentUser!.latitude,
+          _currentUser!.longitude,
+          listing.latitude,
+          listing.longitude,
+        ) /
+        1000; // meters → km
   }
 
   /// Estimate transport cost based on distance (₹5/km baseline).
@@ -329,16 +330,18 @@ class AppState extends ChangeNotifier {
 
   // ─── DATABASE LOADING ──────────────────────────────────────
 
-  /// Load all data from SQLite into memory
-  Future<void> _loadDataFromDB() async {
-    _users = await _db.getUsers();
-    _listings = await _db.getListings();
-    _trades = await _db.getTrades();
-    _evidence = List.from(await _db.getEvidence());
-    _disputes = List.from(await _db.getDisputes());
-    _transactions = await _db.getTransactions();
-    _urgentRequests.clear();
-    _urgentRequests.addAll(await _db.getUrgentRequests());
+  /// Load all data from Firestore (cross-device shared data)
+  Future<void> _loadDataFromFirestore() async {
+    try {
+      _users = await _firestore.getUsers();
+      _listings = await _firestore.getListings();
+      _trades = await _firestore.getTrades();
+      _urgentRequests.clear();
+      final urgentFromFirestore = await _firestore.urgentRequestsStream().first;
+      _urgentRequests.addAll(urgentFromFirestore);
+    } catch (e) {
+      debugPrint('Firestore load failed: $e');
+    }
   }
 
   // ─── URGENT REQUEST ACTIONS ───────────────────────────────
@@ -372,7 +375,7 @@ class AppState extends ChangeNotifier {
     );
 
     _urgentRequests.insert(0, request);
-    _db.insertUrgentRequest(request);
+    _firestore.saveUrgentRequest(request);
     notifyListeners();
   }
 
@@ -459,13 +462,12 @@ class AppState extends ChangeNotifier {
       ),
     );
     // Persist all changes to SQLite
-    _db.updateUrgentRequest(_urgentRequests[index]);
-    _db.updateUser(_currentUser!);
+    _firestore.updateUrgentRequest(_urgentRequests[index]);
+    _firestore.saveUser(_currentUser!);
     if (requesterIndex != -1) {
-      _db.updateUser(_users[requesterIndex]);
+      _firestore.saveUser(_users[requesterIndex]);
     }
-    _db.insertTransaction(_transactions[0]);
-    _db.insertTransaction(_transactions[1]);
+    // Transactions stay in-memory
 
     // 🔔 Notify about urgent request fulfillment
     _notifications.notifyRequestFulfilled(request.productNeeded);
@@ -483,7 +485,7 @@ class AppState extends ChangeNotifier {
     _urgentRequests[index] = _urgentRequests[index].copyWith(
       status: 'cancelled',
     );
-    _db.updateUrgentRequest(_urgentRequests[index]);
+    _firestore.updateUrgentRequest(_urgentRequests[index]);
     notifyListeners();
   }
 
@@ -491,7 +493,9 @@ class AppState extends ChangeNotifier {
 
   void addListing(ListingModel listing) {
     _listings.insert(0, listing);
-    _db.insertListing(listing);
+    // Already synced via _firestore.saveListing above
+    // Sync to Firestore so other users can see it
+    _firestore.saveListing(listing);
     notifyListeners();
     // After adding, check for trade loops
     _checkForTradeLoops();
@@ -501,7 +505,8 @@ class AppState extends ChangeNotifier {
     final index = _listings.indexWhere((l) => l.id == listingId);
     if (index != -1) {
       _listings[index] = _listings[index].copyWith(status: status);
-      _db.updateListingStatus(listingId, status);
+      // Already synced via _firestore.updateListingStatus above
+      _firestore.updateListingStatus(listingId, status);
       notifyListeners();
     }
   }
@@ -608,12 +613,11 @@ class AppState extends ChangeNotifier {
     );
 
     _trades.insert(0, trade);
-    _db.insertTrade(trade);
+    // Already synced via _firestore.saveTrade above
+    _firestore.saveTrade(trade);
 
     // 🔔 Notify about new trade match
-    final productFlow = participants
-        .map((p) => p.offerProduct)
-        .join(' → ');
+    final productFlow = participants.map((p) => p.offerProduct).join(' → ');
     _notifications.notifyTradeMatched(productFlow);
 
     notifyListeners();
@@ -657,7 +661,7 @@ class AppState extends ChangeNotifier {
       _executeTrade(loopId);
     }
 
-    _db.updateTrade(_trades[tradeIndex]);
+    _firestore.updateTrade(_trades[tradeIndex]);
     notifyListeners();
   }
 
@@ -672,7 +676,7 @@ class AppState extends ChangeNotifier {
       updateListingStatus(p.listingId, 'active');
     }
 
-    _db.updateTrade(_trades[tradeIndex]);
+    _firestore.updateTrade(_trades[tradeIndex]);
     notifyListeners();
   }
 
@@ -731,18 +735,14 @@ class AppState extends ChangeNotifier {
         totalTrades: _currentUser!.totalTrades + 1,
         reputationScore: min(100, _currentUser!.reputationScore + 2.0),
       );
-      _db.updateUser(_currentUser!);
+      _firestore.saveUser(_currentUser!);
     }
 
-    _db.updateTrade(_trades[tradeIndex]);
-    for (final txn in _transactions) {
-      _db.insertTransaction(txn);
-    }
+    _firestore.updateTrade(_trades[tradeIndex]);
 
     // 🔔 Notify about trade completion
-    final tradeProducts = trade.participants
-        .map((p) => p.offerProduct)
-        .join(', ');
+    final tradeProducts =
+        trade.participants.map((p) => p.offerProduct).join(', ');
     _notifications.notifyTradeCompleted(tradeProducts);
 
     notifyListeners();
@@ -784,7 +784,8 @@ class AppState extends ChangeNotifier {
 
     // Count how many people WANT this product
     final demandCount = active
-        .where((l) => l.desiredProduct.toLowerCase() == productType.toLowerCase())
+        .where(
+            (l) => l.desiredProduct.toLowerCase() == productType.toLowerCase())
         .length;
 
     // Count how many people OFFER this product
@@ -844,7 +845,7 @@ class AppState extends ChangeNotifier {
     );
 
     _evidence.add(evidence);
-    _db.insertEvidence(evidence);
+    // Evidence stays in-memory
     notifyListeners();
     return evidence;
   }
@@ -872,7 +873,7 @@ class AppState extends ChangeNotifier {
     );
 
     _evidence.add(evidence);
-    _db.insertEvidence(evidence);
+    // Evidence stays in-memory
     notifyListeners();
     return evidence;
   }
@@ -940,10 +941,10 @@ class AppState extends ChangeNotifier {
       _currentUser = _currentUser!.copyWith(
         disputeCount: _currentUser!.disputeCount + 1,
       );
-      _db.updateUser(_currentUser!);
+      _firestore.saveUser(_currentUser!);
     }
 
-    _db.insertDispute(dispute);
+    // Dispute stays in-memory
     notifyListeners();
     return dispute;
   }
@@ -964,11 +965,21 @@ class AppState extends ChangeNotifier {
 
     // Analyze description text for severity keywords
     final descLower = description.toLowerCase();
-    final severityKeywords = ['damaged', 'rotten', 'broken', 'wrong', 'bad', 'spoiled', 'fake'];
+    final severityKeywords = [
+      'damaged',
+      'rotten',
+      'broken',
+      'wrong',
+      'bad',
+      'spoiled',
+      'fake'
+    ];
     final moderateKeywords = ['different', 'less', 'quality', 'size', 'color'];
 
-    final severeCount = severityKeywords.where((k) => descLower.contains(k)).length;
-    final moderateCount = moderateKeywords.where((k) => descLower.contains(k)).length;
+    final severeCount =
+        severityKeywords.where((k) => descLower.contains(k)).length;
+    final moderateCount =
+        moderateKeywords.where((k) => descLower.contains(k)).length;
 
     if (severeCount >= 2) {
       similarity = 25.0;
@@ -1014,10 +1025,10 @@ class AppState extends ChangeNotifier {
       _currentUser = _currentUser!.copyWith(
         disputeCount: _currentUser!.disputeCount + 1,
       );
-      _db.updateUser(_currentUser!);
+      _firestore.saveUser(_currentUser!);
     }
 
-    _db.insertDispute(dispute);
+    // Dispute stays in-memory
     notifyListeners();
     return dispute;
   }
@@ -1042,7 +1053,7 @@ class AppState extends ChangeNotifier {
         refundAmount: _disputes[index].refundAmount,
         resolvedAt: DateTime.now(),
       );
-      _db.updateDispute(_disputes[index]);
+      // Dispute update stays in-memory
       notifyListeners();
     }
   }
@@ -1070,7 +1081,9 @@ class AppState extends ChangeNotifier {
 
   Future<void> _loadSeedData() async {
     // Check if seed data already in db
-    final hasData = await _db.hasSeedData();
+    // Check Firestore instead of SQLite
+    final existingListings = await _firestore.getListings();
+    final hasData = existingListings.isNotEmpty;
     if (hasData) return;
     // Create sample farmers
     _users = [
@@ -1341,19 +1354,17 @@ class AppState extends ChangeNotifier {
 
     // Persist all seed data to SQLite
     for (final user in _users) {
-      await _db.insertUser(user);
+      await _firestore.saveUser(user);
     }
     for (final listing in _listings) {
-      await _db.insertListing(listing);
+      await _firestore.saveListing(listing);
     }
     for (final trade in _trades) {
-      await _db.insertTrade(trade);
+      await _firestore.saveTrade(trade);
     }
-    for (final txn in _transactions) {
-      await _db.insertTransaction(txn);
-    }
+
     for (final req in _urgentRequests) {
-      await _db.insertUrgentRequest(req);
+      await _firestore.saveUrgentRequest(req);
     }
 
     notifyListeners();
