@@ -940,9 +940,7 @@ class AppState extends ChangeNotifier {
       status: allConfirmed ? 'executing' : 'pending',
     );
 
-    if (allConfirmed) {
-      _executeTrade(loopId);
-    }
+    // Trade stays at 'executing' — both parties must upload evidence before completion
 
     _firestore.updateTrade(_trades[tradeIndex]);
     notifyListeners();
@@ -1131,6 +1129,109 @@ class AppState extends ChangeNotifier {
     // Evidence stays in-memory
     notifyListeners();
     return evidence;
+  }
+
+  // ─── EVIDENCE UPLOAD (BOTH PARTIES) ──────────────────────────
+
+  /// Get all evidence for a specific trade.
+  List<EvidenceModel> getEvidenceForTrade(String tradeId) {
+    return _evidence.where((e) => e.tradeId == tradeId).toList();
+  }
+
+  /// Get evidence uploaded by a specific farmer for a trade.
+  EvidenceModel? getMyEvidence(String tradeId, String farmerId) {
+    try {
+      return _evidence.firstWhere(
+        (e) => e.tradeId == tradeId && e.farmerId == farmerId,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Upload delivery evidence for a trade. Both sender and receiver call this.
+  /// When both have uploaded, auto-compare and either complete or dispute.
+  Future<EvidenceModel> uploadEvidence({
+    required String tradeId,
+    required String farmerId,
+    required Uint8List imageBytes,
+    String? photoUrl,
+  }) async {
+    // Generate AI quality report
+    final evidence = await generateQualityScoreFromImage(
+      tradeId: tradeId,
+      farmerId: farmerId,
+      imageBytes: imageBytes,
+      photoUrl: photoUrl,
+    );
+
+    // Check if both parties have now uploaded
+    final tradeEvidence = getEvidenceForTrade(tradeId);
+    final tradeIndex = _trades.indexWhere((t) => t.loopId == tradeId);
+    if (tradeIndex == -1) return evidence;
+
+    final trade = _trades[tradeIndex];
+    final participantIds = trade.participants.map((p) => p.farmerId).toSet();
+    final uploadedIds = tradeEvidence.map((e) => e.farmerId).toSet();
+
+    if (participantIds.every((id) => uploadedIds.contains(id))) {
+      // Both parties uploaded → compare
+      _autoCompareEvidence(tradeId, tradeEvidence, trade);
+    }
+
+    return evidence;
+  }
+
+  /// Compare evidence from both parties using AI.
+  /// If reports match → complete trade. If mismatch → auto-file dispute.
+  void _autoCompareEvidence(
+    String tradeId,
+    List<EvidenceModel> evidenceList,
+    TradeModel trade,
+  ) {
+    if (evidenceList.length < 2) return;
+
+    final e1 = evidenceList[0];
+    final e2 = evidenceList[1];
+
+    // Compare the quality scores
+    final freshDiff = (e1.freshnessScore - e2.freshnessScore).abs();
+    final damageDiff = (e1.damageScore - e2.damageScore).abs();
+    final colorDiff = (e1.colorScore - e2.colorScore).abs();
+    final sizeDiff = (e1.sizeScore - e2.sizeScore).abs();
+    final avgDiff = (freshDiff + damageDiff + colorDiff + sizeDiff) / 4;
+
+    if (avgDiff <= 25) {
+      // Reports are similar enough → trade is legit, complete it
+      _executeTrade(tradeId);
+    } else {
+      // Significant mismatch → auto-create dispute
+      final respondent = e1.farmerId;  // sender (first uploader)
+      final respondentName = trade.participants
+          .firstWhere((p) => p.farmerId == respondent, orElse: () => trade.participants.last)
+          .farmerName;
+
+      fileDispute(
+        tradeId: tradeId,
+        respondentId: respondent,
+        respondentName: respondentName,
+        description:
+            'Auto-detected quality mismatch. '
+            'Sender reported: ${e1.conditionTag} (${e1.aiQualityScore.toStringAsFixed(0)}%). '
+            'Receiver reported: ${e2.conditionTag} (${e2.aiQualityScore.toStringAsFixed(0)}%). '
+            'Average score difference: ${avgDiff.toStringAsFixed(1)} points.',
+      );
+
+      // Move trade to disputed status
+      final idx = _trades.indexWhere((t) => t.loopId == tradeId);
+      if (idx != -1) {
+        _trades[idx] = _trades[idx].copyWith(status: 'disputed');
+        _firestore.updateTrade(_trades[idx]);
+      }
+
+      _notifications.notifyDisputeResolved('Quality mismatch detected — dispute filed automatically');
+      notifyListeners();
+    }
   }
 
   /// Fallback: generate quality score without an image (uses defaults).
