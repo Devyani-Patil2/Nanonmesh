@@ -63,7 +63,7 @@ class _PriceDiscoveryScreenState extends State<PriceDiscoveryScreen> {
       ..sort((a, b) => b.value.compareTo(a.value));
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
+      
       appBar: AppBar(
         title: Text('Mandi Price Discovery',
             style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),

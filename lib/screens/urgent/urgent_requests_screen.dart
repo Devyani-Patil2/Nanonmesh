@@ -34,7 +34,7 @@ class _UrgentRequestsScreenState extends State<UrgentRequestsScreen>
     final appState = context.watch<AppState>();
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
+      
       appBar: AppBar(
         title: Text('Urgent Requests',
             style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),

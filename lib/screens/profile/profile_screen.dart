@@ -17,11 +17,10 @@ class ProfileScreen extends StatelessWidget {
     final user = appState.currentUser;
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 220,
+            expandedHeight: 250,
             pinned: true,
             automaticallyImplyLeading: false,
             backgroundColor: AppTheme.primaryGreen,
@@ -125,7 +124,7 @@ class ProfileScreen extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
@@ -219,6 +218,7 @@ class ProfileScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _statBox(
+                            context,
                             '${user?.totalTrades ?? 0}',
                             'Total Trades',
                             Icons.sync_rounded,
@@ -228,6 +228,7 @@ class ProfileScreen extends StatelessWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _statBox(
+                            context,
                             '${user?.disputeCount ?? 0}',
                             'Disputes',
                             Icons.gavel_rounded,
@@ -237,6 +238,7 @@ class ProfileScreen extends StatelessWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _statBox(
+                            context,
                             '₹${user?.creditBalance.toStringAsFixed(0) ?? '0'}',
                             'Credits',
                             Icons.account_balance_wallet,
@@ -320,7 +322,7 @@ class ProfileScreen extends StatelessWidget {
                     delay: const Duration(milliseconds: 200),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
@@ -339,7 +341,7 @@ class ProfileScreen extends StatelessWidget {
                               Navigator.pushNamed(context, '/listings');
                             },
                           ),
-                          _divider(),
+                          _divider(context),
                           _menuItem(
                             context,
                             Icons.swap_calls_rounded,
@@ -348,7 +350,7 @@ class ProfileScreen extends StatelessWidget {
                               Navigator.pushNamed(context, '/trades');
                             },
                           ),
-                          _divider(),
+                          _divider(context),
                           _menuItem(
                             context,
                             Icons.account_balance_wallet_outlined,
@@ -357,7 +359,7 @@ class ProfileScreen extends StatelessWidget {
                               Navigator.pushNamed(context, '/wallet');
                             },
                           ),
-                          _divider(),
+                          _divider(context),
                           _menuItem(
                             context,
                             Icons.history_rounded,
@@ -366,7 +368,7 @@ class ProfileScreen extends StatelessWidget {
                               Navigator.pushNamed(context, '/credit-history');
                             },
                           ),
-                          _divider(),
+                          _divider(context),
                           _menuItem(
                             context,
                             Icons.shield_outlined,
@@ -383,7 +385,7 @@ class ProfileScreen extends StatelessWidget {
                               Navigator.pushNamed(context, '/quality-check');
                             },
                           ),
-                          _divider(),
+                          _divider(context),
                           _menuItem(
                             context,
                             Icons.bar_chart_rounded,
@@ -392,7 +394,7 @@ class ProfileScreen extends StatelessWidget {
                               Navigator.pushNamed(context, '/price-discovery');
                             },
                           ),
-                          _divider(),
+                          _divider(context),
                           _menuItem(
                             context,
                             Icons.upload_file_rounded,
@@ -412,7 +414,7 @@ class ProfileScreen extends StatelessWidget {
                               );
                             },
                           ),
-                          _divider(),
+                          _divider(context),
                           // Dark Mode Toggle
                           ListTile(
                             leading: Icon(
@@ -519,11 +521,12 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _statBox(String value, String label, IconData icon, Color color) {
+  Widget _statBox(BuildContext context, String value, String label,
+      IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
@@ -562,17 +565,26 @@ class ProfileScreen extends StatelessWidget {
       leading: Icon(icon, color: AppTheme.primaryGreen, size: 22),
       title: Text(
         label,
-        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
+        style: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: Theme.of(context).textTheme.bodyLarge?.color,
+        ),
       ),
       trailing: Icon(
         Icons.arrow_forward_ios,
         size: 16,
-        color: Colors.grey.shade400,
+        color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.3) ??
+            Colors.grey.shade400,
       ),
     );
   }
 
-  Widget _divider() {
-    return Divider(height: 1, indent: 56, color: Colors.grey.shade100);
+  Widget _divider(BuildContext context) {
+    return Divider(
+      height: 1,
+      indent: 56,
+      color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
+    );
   }
 }

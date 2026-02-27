@@ -17,7 +17,7 @@ class CreditHistoryScreen extends StatelessWidget {
     final balance = appState.currentUser?.creditBalance ?? 0;
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
+      
       appBar: AppBar(
         title: Text('Credit History',
             style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),

@@ -55,7 +55,7 @@ class ListingDetailScreen extends StatelessWidget {
     final myTradeListing = myMatchingListing ?? myBestListing;
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
+      
       appBar: AppBar(
         title: Text(listing.productType,
             style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),

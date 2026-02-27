@@ -43,7 +43,6 @@ class _ListingsScreenState extends State<ListingsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceLight,
       appBar: AppBar(
         title: Text('Marketplace',
             style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
@@ -175,10 +174,14 @@ class _ListingsScreenState extends State<ListingsScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? AppTheme.primaryGreen : Colors.white,
+            color: isSelected
+                ? AppTheme.primaryGreen
+                : Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300,
+              color: isSelected
+                  ? AppTheme.primaryGreen
+                  : Theme.of(context).dividerColor.withValues(alpha: 0.1),
             ),
           ),
           child: Center(
@@ -189,7 +192,9 @@ class _ListingsScreenState extends State<ListingsScreen> {
               style: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.grey.shade700,
+                color: isSelected
+                    ? Colors.white
+                    : Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
           ),
@@ -210,7 +215,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
@@ -382,7 +387,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(

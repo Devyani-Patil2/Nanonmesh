@@ -178,7 +178,7 @@ class _MainShellState extends State<MainShell> {
         height: 68,
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         elevation: 12,
         shadowColor: Colors.black.withValues(alpha: 0.15),
         child: Row(
@@ -225,3 +225,9 @@ class _MainShellState extends State<MainShell> {
     );
   }
 }
+
+
+
+
+
+// hello 
