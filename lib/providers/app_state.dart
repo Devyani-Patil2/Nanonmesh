@@ -1,4 +1,5 @@
-﻿import 'dart:async';
+﻿import 'dart:io';
+import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -1457,10 +1458,20 @@ class AppState extends ChangeNotifier {
 
     // Real image comparison if both photos provided
     if (complaintImageBytes != null && deliveryImageBytes != null) {
-      final result = _imageComparison.compareImageBytes(
-        complaintImageBytes,
-        deliveryImageBytes,
-      );
+      // Python API expects files, so we write the bytes to temp files
+      final tempDir = Directory.systemTemp;
+      final file1 = File('${tempDir.path}/comp_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final file2 = File('${tempDir.path}/deliv_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      
+      await file1.writeAsBytes(complaintImageBytes);
+      await file2.writeAsBytes(deliveryImageBytes);
+
+      final result = await _imageComparison.compareImages(file1, file2);
+      
+      // Cleanup temp files
+      if (await file1.exists()) await file1.delete();
+      if (await file2.exists()) await file2.delete();
+
       similarity = result['similarity'] as double;
       verdict = result['verdict'] as String;
       refund = (result['refundAmount'] as num?)?.toDouble() ?? 0;
