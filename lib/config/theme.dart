@@ -414,9 +414,11 @@ class AppTheme {
       case 'completed':
       case 'excellent':
         return successGreen;
+      case 'submitted':
       case 'pending':
       case 'good':
         return accentAmber;
+      case 'under_review':
       case 'locked':
       case 'average':
         return warningOrange;

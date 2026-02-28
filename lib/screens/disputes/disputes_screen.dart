@@ -365,26 +365,45 @@ class DisputesScreen extends StatelessWidget {
                   height: 52,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      final appState = context.read<AppState>();
-                      final respondent = trade.participants.firstWhere(
-                        (p) => p.farmerId != appState.currentUser?.id,
-                        orElse: () => trade.participants.first,
-                      );
-                      appState.fileDispute(
-                        tradeId: trade.loopId,
-                        respondentId: respondent.farmerId,
-                        respondentName: respondent.farmerName,
-                        description: controller.text.isEmpty
-                            ? 'Quality mismatch'
-                            : controller.text,
-                      );
-                      Navigator.pop(formContext);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Dispute filed! AI is analyzing... 🤖'),
-                          backgroundColor: AppTheme.skyBlue,
-                        ),
-                      );
+                      if (controller.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please describe the issue first! ✍️'),
+                            backgroundColor: AppTheme.warningOrange,
+                          ),
+                        );
+                        return;
+                      }
+
+                      try {
+                        final appState = context.read<AppState>();
+                        final respondent = trade.participants.firstWhere(
+                          (p) => p.farmerId != appState.currentUser?.id,
+                          orElse: () => trade.participants.first,
+                        );
+                        
+                        appState.fileDispute(
+                          tradeId: trade.loopId,
+                          respondentId: respondent.farmerId,
+                          respondentName: respondent.farmerName,
+                          description: controller.text.trim(),
+                        );
+                        
+                        Navigator.pop(formContext);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Dispute SUBMITTED! AI has analyzed your request. 🤖'),
+                            backgroundColor: AppTheme.primaryGreen,
+                          ),
+                        );
+                      } catch (e) {
+                         ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error submitting dispute: $e'),
+                            backgroundColor: AppTheme.errorRed,
+                          ),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.gavel_rounded, size: 20),
                     label: Text(

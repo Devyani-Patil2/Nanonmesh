@@ -1576,7 +1576,7 @@ class AppState extends ChangeNotifier {
       aiSimilarityScore: similarity,
       aiVerdict: verdict,
       refundAmount: refund,
-      status: 'under_review',
+      status: 'submitted',
     );
 
     _disputes.add(dispute);
