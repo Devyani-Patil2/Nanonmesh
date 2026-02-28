@@ -21,7 +21,7 @@ class HomeScreen extends StatelessWidget {
           // Hero App Bar
           SliverAppBar(
             expandedHeight: 200,
-            floating: false,
+            floating: true,
             pinned: true,
             automaticallyImplyLeading: false,
             backgroundColor: AppTheme.primaryGreen,
@@ -46,14 +46,13 @@ class HomeScreen extends StatelessWidget {
                                 shape: BoxShape.circle,
                               ),
                               child: Center(
-                                child: Text(
-                                  user?.name.isNotEmpty == true
-                                      ? user!.name[0].toUpperCase()
-                                      : 'F',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(22),
+                                  child: Image.asset(
+                                    'assets/images/app_logo.png',
+                                    width: 44,
+                                    height: 44,
+                                    fit: BoxFit.cover,
                                   ),
                                 ),
                               ),
@@ -64,19 +63,19 @@ class HomeScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Namaste! 🙏',
+                                    AppConstants.appName,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Namaste ${user?.name.split(' ').first ?? 'Farmer'}! 🙏',
                                     style: GoogleFonts.inter(
                                       fontSize: 13,
                                       color:
                                           Colors.white.withValues(alpha: 0.8),
-                                    ),
-                                  ),
-                                  Text(
-                                    user?.name ?? 'Farmer',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
                                     ),
                                   ),
                                 ],
