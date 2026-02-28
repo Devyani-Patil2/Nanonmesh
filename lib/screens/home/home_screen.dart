@@ -41,19 +41,12 @@ class HomeScreen extends StatelessWidget {
                             Container(
                               width: 44,
                               height: 44,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
                                 shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(22),
-                                  child: Image.asset(
-                                    'assets/images/app_logo.png',
-                                    width: 44,
-                                    height: 44,
-                                    fit: BoxFit.cover,
-                                  ),
+                                image: DecorationImage(
+                                  image: AssetImage('assets/images/app_logo.png'),
+                                  fit: BoxFit.cover,
                                 ),
                               ),
                             ),

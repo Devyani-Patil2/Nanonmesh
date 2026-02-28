@@ -2,7 +2,7 @@
 
 class AppConstants {
   // App Info
-  static const String appName = 'NanonMesh';
+  static const String appName = 'AgroSwap';
   static const String appTagline = 'Smart Barter for Smart Farmers';
   static const String appVersion = '1.0.0';
 

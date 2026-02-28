@@ -67,24 +67,18 @@ class _SplashScreenState extends State<SplashScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Spacer(flex: 2),
-                // Logo
                 FadeInDown(
                   duration: const Duration(milliseconds: 800),
                   child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                    width: 140,
+                    height: 140,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.3),
-                        width: 2,
+                      image: DecorationImage(
+                        image: AssetImage('assets/images/app_logo.png'),
+                        fit: BoxFit.cover,
                       ),
-                    ),
-                    child: Image.asset(
-                      'assets/images/app_logo.png',
-                      width: 64,
-                      height: 64,
                     ),
                   ),
                 ),

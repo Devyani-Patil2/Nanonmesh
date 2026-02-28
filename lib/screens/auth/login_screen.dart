@@ -74,20 +74,16 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 60),
-                // Back icon area (decorative)
                 FadeInDown(
                   child: Container(
                     width: 80,
                     height: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
                       shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Image.asset(
-                        'assets/images/app_logo.png',
-                        width: 44,
-                        height: 44,
+                      image: DecorationImage(
+                        image: AssetImage('assets/images/app_logo.png'),
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),
