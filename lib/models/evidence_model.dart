@@ -2,6 +2,8 @@ class EvidenceModel {
   final String id;
   final String tradeId;
   final String farmerId;
+  final String role; // 'sending' or 'receiving'
+  final String productName; // which product this evidence is for
   final String? photoUrl;
   final String? photoHash;
   final double aiQualityScore;
@@ -18,6 +20,8 @@ class EvidenceModel {
     required this.id,
     required this.tradeId,
     required this.farmerId,
+    this.role = 'sending',
+    this.productName = '',
     this.photoUrl,
     this.photoHash,
     this.aiQualityScore = 0.0,
@@ -36,6 +40,8 @@ class EvidenceModel {
       'id': id,
       'tradeId': tradeId,
       'farmerId': farmerId,
+      'role': role,
+      'productName': productName,
       'photoUrl': photoUrl,
       'photoHash': photoHash,
       'aiQualityScore': aiQualityScore,
@@ -55,6 +61,8 @@ class EvidenceModel {
       id: map['id'] ?? '',
       tradeId: map['tradeId'] ?? '',
       farmerId: map['farmerId'] ?? '',
+      role: map['role'] ?? 'sending',
+      productName: map['productName'] ?? '',
       photoUrl: map['photoUrl'],
       photoHash: map['photoHash'],
       aiQualityScore: (map['aiQualityScore'] ?? 0.0).toDouble(),

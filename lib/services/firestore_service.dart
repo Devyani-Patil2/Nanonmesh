@@ -299,4 +299,29 @@ class FirestoreService {
   Future<void> updateUrgentRequest(UrgentRequestModel request) async {
     await saveUrgentRequest(request);
   }
+
+  // ─── EVIDENCE ──────────────────────────────────────────────
+
+  /// Save evidence to Firestore
+  Future<void> saveEvidence(Map<String, dynamic> evidence) async {
+    await _firestore.collection('evidence').doc(evidence['id']).set(evidence);
+  }
+
+  /// Get all evidence for a trade (real-time stream)
+  Stream<List<Map<String, dynamic>>> evidenceStream(String tradeId) {
+    return _firestore
+        .collection('evidence')
+        .where('tradeId', isEqualTo: tradeId)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.data()).toList());
+  }
+
+  /// Get all evidence for a trade (one-time)
+  Future<List<Map<String, dynamic>>> getEvidenceForTrade(String tradeId) async {
+    final snap = await _firestore
+        .collection('evidence')
+        .where('tradeId', isEqualTo: tradeId)
+        .get();
+    return snap.docs.map((d) => d.data()).toList();
+  }
 }
